@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'TVF_VERSION',    '1.4.3' );
+define( 'TVF_VERSION',    '1.4.4' );
 define( 'TVF_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TVF_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
