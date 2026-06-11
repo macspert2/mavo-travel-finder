@@ -19,6 +19,24 @@
 	let   nextOffset = BATCH;
 
 	// -------------------------------------------------------------------------
+	// Cookie helpers — remember last filter state for returning visitors
+	// -------------------------------------------------------------------------
+
+	const COOKIE_NAME = 'tvf_filters';
+	const COOKIE_DAYS = 30;
+
+	function setCookie( name, value, days ) {
+		const exp = new Date( Date.now() + days * 864e5 ).toUTCString();
+		document.cookie = name + '=' + encodeURIComponent( value )
+			+ '; expires=' + exp + '; path=/; SameSite=Lax';
+	}
+
+	function getCookie( name ) {
+		const match = document.cookie.match( '(?:^|; )' + name + '=([^;]*)' );
+		return match ? decodeURIComponent( match[ 1 ] ) : '';
+	}
+
+	// -------------------------------------------------------------------------
 	// URL helpers
 	// -------------------------------------------------------------------------
 
@@ -225,6 +243,7 @@
 		history.pushState( { f: selected.join( ',' ) }, '', buildUrl( selected ) );
 		updateSummary( selected );
 		loadResults( selected );
+		setCookie( COOKIE_NAME, selected.join( ',' ), COOKIE_DAYS );
 	} );
 
 	// Browser back/forward
@@ -237,6 +256,7 @@
 		} );
 		updateSummary( selected );
 		loadResults( selected );
+		setCookie( COOKIE_NAME, selected.join( ',' ), COOKIE_DAYS );
 	} );
 
 	// Reset button (when rendered as <button> for the no-selection state)
@@ -249,6 +269,15 @@
 			} );
 			updateSummary( [] );
 			loadResults( [] );
+			setCookie( COOKIE_NAME, '', COOKIE_DAYS );
+		} );
+	}
+
+	// Reset button (when rendered as <a> link — initial SSR with active filters).
+	// Clear the cookie before the navigation so restore logic doesn't re-apply on reload.
+	if ( resetBtn && resetBtn.tagName === 'A' ) {
+		resetBtn.addEventListener( 'click', function () {
+			setCookie( COOKIE_NAME, '', COOKIE_DAYS );
 		} );
 	}
 
@@ -320,6 +349,31 @@
 				} catch ( _e ) {}
 			}
 		} );
+	}
+
+	// -------------------------------------------------------------------------
+	// Restore last filter state on page load (only when URL has no f= param)
+	// -------------------------------------------------------------------------
+
+	if ( ! new URL( window.location.href ).searchParams.has( 'f' ) ) {
+		const saved = getCookie( COOKIE_NAME );
+		if ( saved ) {
+			const slugs = saved.split( ',' ).filter( Boolean );
+			if ( slugs.length ) {
+				history.replaceState( { f: saved }, '', buildUrl( slugs ) );
+				wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( c ) {
+					const on = slugs.includes( c.dataset.slug );
+					c.classList.toggle( 'is-on', on );
+					c.setAttribute( 'aria-checked', on ? 'true' : 'false' );
+					const next = on
+						? slugs.filter( x => x !== c.dataset.slug )
+						: [ ...slugs, c.dataset.slug ];
+					c.href = buildUrl( next );
+				} );
+				updateSummary( slugs );
+				loadResults( slugs );
+			}
+		}
 	}
 
 } )();
