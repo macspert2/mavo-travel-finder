@@ -63,6 +63,10 @@ class TVF_Frontend {
 		$slugs  = self::parse_filter_param( $request->get_param( 'f' ) );
 		$result = self::render_cards( $slugs, $lang, $offset );
 
+		if ( $offset === 0 ) {
+			$result['dead_slugs'] = TVF_Store::compute_dead_slugs( $lang, $slugs );
+		}
+
 		return new WP_REST_Response( $result, 200 );
 	}
 
@@ -105,8 +109,7 @@ class TVF_Frontend {
 		$base_url = self::base_url();
 
 		$intro      = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
-		$cards      = self::render_cards( $selected, $lang, 0 );
-		$dead_slugs = $cards['dead_slugs'] ?? [];
+		$dead_slugs = TVF_Store::compute_dead_slugs( $lang, $selected );
 
 		ob_start();
 		?>
@@ -155,6 +158,8 @@ class TVF_Frontend {
 					</button>
 				<?php endif; ?>
 			</div>
+
+			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>
 
 			<div id="tvf-results" class="tvf-results">
 				<?php echo $cards['html']; ?>
@@ -265,9 +270,6 @@ class TVF_Frontend {
 			array_pop( $rows ); // discard the probe row
 		}
 
-		// Compute incompatible filters only on the first page (selection hasn't changed on load-more).
-		$dead_slugs = $offset === 0 ? TVF_Store::compute_dead_slugs( $lang, $slugs ) : null;
-
 		if ( empty( $rows ) ) {
 			// offset=0: wrap no-results in the grid container so JS can replace results.innerHTML uniformly.
 			// offset>0: shouldn't happen in practice; return empty.
@@ -277,9 +279,8 @@ class TVF_Frontend {
 					. '</p>'
 				: '';
 			$result = [
-				'html'       => $offset === 0 ? '<div class="tvf-cards-grid">' . $inner . '</div>' : '',
-				'has_more'   => false,
-				'dead_slugs' => $dead_slugs,
+				'html'     => $offset === 0 ? '<div class="tvf-cards-grid">' . $inner . '</div>' : '',
+				'has_more' => false,
 			];
 			set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 			return $result;
@@ -314,7 +315,7 @@ class TVF_Frontend {
 			? '<div class="tvf-cards-grid">' . $articles_html . '</div>'
 			: $articles_html;
 
-		$result = [ 'html' => $html, 'has_more' => $has_more, 'dead_slugs' => $dead_slugs ];
+		$result = [ 'html' => $html, 'has_more' => $has_more ];
 		set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 		return $result;
 	}

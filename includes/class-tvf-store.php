@@ -157,19 +157,22 @@ class TVF_Store {
 	 * @return string[] Dead (would-be-empty) filter slugs.
 	 */
 	public static function compute_dead_slugs( string $lang, array $selected_slugs ): array {
+		sort( $selected_slugs ); // canonical order for cache key
+		$cache_key = 'tvf_dead_' . $lang . '_' . md5( implode( ',', $selected_slugs ) );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		global $wpdb;
 		$table      = self::table_name();
 		$all_slugs  = tvf_get_all_slugs();
 		$candidates = array_values( array_diff( $all_slugs, $selected_slugs ) );
 
 		if ( empty( $candidates ) ) {
-			return [];
-		}
-
-		$cand_ph = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
-
-		if ( empty( $selected_slugs ) ) {
-			// No active filters — dead = slugs with no qualifying published posts at all.
+			$dead = [];
+		} elseif ( empty( $selected_slugs ) ) {
+			$cand_ph = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$alive = $wpdb->get_col(
 				$wpdb->prepare(
@@ -183,44 +186,45 @@ class TVF_Store {
 					...array_merge( [ $lang ], $candidates )
 				)
 			) ?: [];
-			return array_values( array_diff( $candidates, $alive ) );
+			$dead = array_values( array_diff( $candidates, $alive ) );
+		} else {
+			$cand_ph = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+			$sel_ph  = implode( ',', array_fill( 0, count( $selected_slugs ), '%s' ) );
+			$args    = array_merge(
+				[ $lang ],
+				$candidates,
+				[ $lang ],
+				$selected_slugs,
+				[ count( $selected_slugs ) ]
+			);
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$alive = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT pf.filter_slug
+					 FROM {$table} pf
+					 JOIN {$wpdb->posts} p ON p.ID = pf.post_id
+					    AND p.post_status = 'publish' AND p.post_type = 'post'
+					 WHERE pf.lang = %s
+					   AND pf.filter_slug IN ({$cand_ph})
+					   AND pf.weight > 0
+					   AND pf.post_id IN (
+					       SELECT pf2.post_id
+					       FROM {$table} pf2
+					       WHERE pf2.lang = %s
+					         AND pf2.filter_slug IN ({$sel_ph})
+					         AND pf2.weight > 0
+					       GROUP BY pf2.post_id
+					       HAVING COUNT(DISTINCT pf2.filter_slug) = %d
+					   )
+					 GROUP BY pf.filter_slug",
+					...$args
+				)
+			) ?: [];
+			$dead = array_values( array_diff( $candidates, $alive ) );
 		}
 
-		// With active filters — dead = adding this candidate yields 0 results.
-		$sel_ph = implode( ',', array_fill( 0, count( $selected_slugs ), '%s' ) );
-		$args   = array_merge(
-			[ $lang ],
-			$candidates,
-			[ $lang ],
-			$selected_slugs,
-			[ count( $selected_slugs ) ]
-		);
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$alive = $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT pf.filter_slug
-				 FROM {$table} pf
-				 JOIN {$wpdb->posts} p ON p.ID = pf.post_id
-				    AND p.post_status = 'publish' AND p.post_type = 'post'
-				 WHERE pf.lang = %s
-				   AND pf.filter_slug IN ({$cand_ph})
-				   AND pf.weight > 0
-				   AND pf.post_id IN (
-				       SELECT pf2.post_id
-				       FROM {$table} pf2
-				       WHERE pf2.lang = %s
-				         AND pf2.filter_slug IN ({$sel_ph})
-				         AND pf2.weight > 0
-				       GROUP BY pf2.post_id
-				       HAVING COUNT(DISTINCT pf2.filter_slug) = %d
-				   )
-				 GROUP BY pf.filter_slug",
-				...$args
-			)
-		) ?: [];
-
-		return array_values( array_diff( $candidates, $alive ) );
+		set_transient( $cache_key, $dead, HOUR_IN_SECONDS );
+		return $dead;
 	}
 
 	// -------------------------------------------------------------------------
@@ -257,20 +261,15 @@ class TVF_Store {
 	public static function bust_cache( string $lang ): void {
 		global $wpdb;
 
-		// Works for both DB-based and APCu/Memcache transients because we delete the option rows.
-		$prefix = '_transient_tvf_r2_' . $lang;
-		$wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-				$wpdb->esc_like( $prefix ) . '%'
-			)
-		);
-		$prefix_timeout = '_transient_timeout_tvf_r2_' . $lang;
-		$wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-				$wpdb->esc_like( $prefix_timeout ) . '%'
-			)
-		);
+		foreach ( [ 'tvf_r2_', 'tvf_dead_' ] as $prefix_base ) {
+			foreach ( [ '_transient_', '_transient_timeout_' ] as $type ) {
+				$wpdb->query(
+					$wpdb->prepare(
+						"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+						$wpdb->esc_like( $type . $prefix_base . $lang ) . '%'
+					)
+				);
+			}
+		}
 	}
 }
