@@ -24,7 +24,17 @@
 
 	function baseUrl() {
 		const u = new URL( window.location.href );
-		u.search = '';
+		u.searchParams.delete( 'f' );
+		return u.toString();
+	}
+
+	function buildUrl( slugs ) {
+		const u = new URL( window.location.href );
+		if ( slugs.length ) {
+			u.searchParams.set( 'f', slugs.join( ',' ) );
+		} else {
+			u.searchParams.delete( 'f' );
+		}
 		return u.toString();
 	}
 
@@ -119,17 +129,16 @@
 
 		// Update every chip's href to reflect the new selection
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
-			const s   = c.dataset.slug;
-			const on  = selected.includes( s );
+			const s    = c.dataset.slug;
+			const on   = selected.includes( s );
 			const next = on
 				? selected.filter( x => x !== s )
 				: [ ...selected, s ];
-			c.href = next.length ? baseUrl() + '?f=' + next.join( ',' ) : baseUrl();
+			c.href = buildUrl( next );
 		} );
 
 		// Push URL
-		const newUrl = selected.length ? baseUrl() + '?f=' + selected.join( ',' ) : baseUrl();
-		history.pushState( { f: selected.join( ',' ) }, '', newUrl );
+		history.pushState( { f: selected.join( ',' ) }, '', buildUrl( selected ) );
 
 		updateSummary( selected );
 		loadResults( selected );

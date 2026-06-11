@@ -183,7 +183,9 @@ class TVF_Frontend {
 		$new_selected = $is_on
 			? array_values( array_diff( $selected, [ $slug ] ) )
 			: array_merge( $selected, [ $slug ] );
-		$url          = empty( $new_selected ) ? $base_url : $base_url . '?f=' . implode( ',', $new_selected );
+		$url          = empty( $new_selected )
+			? $base_url
+			: add_query_arg( 'f', implode( ',', $new_selected ), $base_url );
 
 		return sprintf(
 			'<a href="%s" class="tvf-chip%s" role="checkbox" aria-checked="%s" data-slug="%s">%s</a>',
@@ -290,11 +292,8 @@ class TVF_Frontend {
 	}
 
 	private static function base_url(): string {
-		global $post;
-		$url = is_a( $post, 'WP_Post' ) ? get_permalink( $post ) : '';
-		if ( ! $url ) {
-			$url = ( is_ssl() ? 'https' : 'http' ) . '://' . $_SERVER['HTTP_HOST'] . strtok( $_SERVER['REQUEST_URI'], '?' );
-		}
-		return (string) $url;
+		// Current page URL with the 'f' param stripped — works for published pages,
+		// previews (?page_id=X&preview=true), and any other query-string context.
+		return remove_query_arg( 'f' );
 	}
 }
