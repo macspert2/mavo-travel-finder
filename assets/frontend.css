@@ -4,13 +4,15 @@
    ============================================================ */
 
 :root {
-  --tvf-bg:           #faf8f5;
+/*  --tvf-bg:           #faf8f5; */
+  --tvf-bg:           #ffffff;
   --tvf-text:         #1a1a2e;
   --tvf-accent:       #e07b54;
   --tvf-accent-light: #f5d9cc;
   --tvf-muted:        #8b8680;
   --tvf-border:       #d0ccc8;
   --tvf-cream:        #f0ece6;
+  --tvf-blue:         RGBA(78,116,165,0.3);
   --tvf-white:        #ffffff;
   --tvf-shadow:       0 4px 24px rgba(26, 26, 46, 0.09);
   --tvf-shadow-hover: 0 12px 40px rgba(26, 26, 46, 0.18);
@@ -144,8 +146,9 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--tvf-cream);
-  border-bottom: 1px solid var(--tvf-border);
+  background: var(--tvf-blue);
+/*  border-bottom: 1px solid var(--tvf-border); */
+  border-radius: var(--tvf-radius-card);
   padding: 10px 24px;
   margin: 0 -24px 28px;
   font-size: 13px;
