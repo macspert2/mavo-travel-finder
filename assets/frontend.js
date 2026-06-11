@@ -8,14 +8,14 @@
 	const restUrl      = tvfFrontend.restUrl;
 	const restNonce    = tvfFrontend.nonce;
 	const lang         = wrap.dataset.lang || 'fr';
-	const grid         = document.getElementById( 'tvf-cards-grid' );
+	const results      = document.getElementById( 'tvf-results' );
 	const summary      = document.getElementById( 'tvf-summary' );
 	const resetBtn     = document.getElementById( 'tvf-reset' );
 	const loadMoreWrap = document.getElementById( 'tvf-load-more-wrap' );
 	const loadMoreBtn  = document.getElementById( 'tvf-load-more' );
 
 	const BATCH = 42;
-	let   nextOffset = BATCH; // offset for the next "load more" fetch
+	let   nextOffset = BATCH;
 
 	// -------------------------------------------------------------------------
 	// URL helpers
@@ -70,13 +70,17 @@
 
 	let controller = null;
 
-	/** Replace grid content with a fresh first page. */
+	/**
+	 * Replace the entire results area with a fresh first page.
+	 * data.html (offset=0) includes the <div class="tvf-cards-grid"> wrapper,
+	 * so setting results.innerHTML restores the full correct DOM structure.
+	 */
 	function loadResults( slugs ) {
 		if ( controller ) controller.abort();
 		controller = new AbortController();
 
-		grid.closest( '.tvf-results' ).classList.add( 'tvf-loading' );
-		setLoadMore( false, BATCH ); // hide button while loading
+		results.classList.add( 'tvf-loading' );
+		setLoadMore( false, BATCH );
 
 		fetch( restFetchUrl( slugs, 0 ), {
 			signal:  controller.signal,
@@ -84,20 +88,26 @@
 		} )
 			.then( r => r.json() )
 			.then( function ( data ) {
-				grid.innerHTML = data.html || '';
-				grid.closest( '.tvf-results' ).classList.remove( 'tvf-loading' );
+				results.innerHTML = data.html || '';
+				results.classList.remove( 'tvf-loading' );
 				setLoadMore( data.has_more, BATCH );
 				controller = null;
 				updateResetBtn( slugs );
+				if ( Array.isArray( data.dead_slugs ) ) {
+					updateDeadChips( data.dead_slugs );
+				}
 			} )
 			.catch( function ( err ) {
 				if ( err.name !== 'AbortError' ) {
-					grid.closest( '.tvf-results' ).classList.remove( 'tvf-loading' );
+					results.classList.remove( 'tvf-loading' );
 				}
 			} );
 	}
 
-	/** Append the next page of cards to the existing grid. */
+	/**
+	 * Append the next page of bare <article> elements to the existing grid.
+	 * data.html (offset>0) contains only <article> elements, no wrapper.
+	 */
 	function loadMore( slugs, offset ) {
 		if ( ! loadMoreBtn ) return;
 
@@ -111,7 +121,10 @@
 			.then( r => r.json() )
 			.then( function ( data ) {
 				if ( data.html ) {
-					grid.insertAdjacentHTML( 'beforeend', data.html );
+					const grid = results.querySelector( '.tvf-cards-grid' );
+					if ( grid ) {
+						grid.insertAdjacentHTML( 'beforeend', data.html );
+					}
 				}
 				setLoadMore( data.has_more, offset + BATCH );
 				loadMoreBtn.disabled    = false;
@@ -121,6 +134,23 @@
 				loadMoreBtn.disabled    = false;
 				loadMoreBtn.textContent = originalLabel;
 			} );
+	}
+
+	// -------------------------------------------------------------------------
+	// Dead-chip state
+	// -------------------------------------------------------------------------
+
+	function updateDeadChips( deadSlugs ) {
+		wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( chip ) {
+			const isDead = deadSlugs.includes( chip.dataset.slug ) && ! chip.classList.contains( 'is-on' );
+			chip.classList.toggle( 'is-dead', isDead );
+			chip.setAttribute( 'aria-disabled', isDead ? 'true' : 'false' );
+			if ( isDead ) {
+				chip.setAttribute( 'tabindex', '-1' );
+			} else {
+				chip.removeAttribute( 'tabindex' );
+			}
+		} );
 	}
 
 	// -------------------------------------------------------------------------
@@ -136,7 +166,7 @@
 		}
 		const labels = [];
 		wrap.querySelectorAll( '.tvf-chip.is-on' ).forEach( c => labels.push( c.textContent.trim() ) );
-		summary.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
+		summary.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
 	}
 
 	function updateResetBtn( slugs ) {
@@ -173,13 +203,11 @@
 			selected.push( slug );
 		}
 
-		// Update chip states immediately
 		wrap.querySelectorAll( '.tvf-chip[data-slug="' + slug + '"]' ).forEach( c => {
 			c.classList.toggle( 'is-on', idx < 0 );
 			c.setAttribute( 'aria-checked', idx < 0 ? 'true' : 'false' );
 		} );
 
-		// Update every chip's href
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
 			const s    = c.dataset.slug;
 			const on   = selected.includes( s );
@@ -226,6 +254,50 @@
 	if ( loadMoreBtn ) {
 		loadMoreBtn.addEventListener( 'click', function () {
 			loadMore( getSelected(), nextOffset );
+		} );
+	}
+
+	// -------------------------------------------------------------------------
+	// Share button — copy URL to clipboard, show tooltip
+	// -------------------------------------------------------------------------
+
+	const shareBtn     = document.getElementById( 'tvf-share' );
+	const shareTooltip = document.getElementById( 'tvf-share-tooltip' );
+
+	if ( shareBtn && shareTooltip ) {
+		let hideTimer    = null;
+		let outsideClick = null;
+
+		function hideTooltip() {
+			shareTooltip.setAttribute( 'hidden', '' );
+			shareBtn.classList.remove( 'is-copied' );
+			clearTimeout( hideTimer );
+			if ( outsideClick ) {
+				document.removeEventListener( 'click', outsideClick );
+				outsideClick = null;
+			}
+		}
+
+		function showTooltip() {
+			shareTooltip.removeAttribute( 'hidden' );
+			shareBtn.classList.add( 'is-copied' );
+
+			// Auto-hide after 3 s
+			clearTimeout( hideTimer );
+			hideTimer = setTimeout( hideTooltip, 3000 );
+
+			// Hide on the next click anywhere outside the button
+			if ( outsideClick ) document.removeEventListener( 'click', outsideClick );
+			outsideClick = function () { hideTooltip(); };
+			// Defer so this click event doesn't immediately trigger dismissal
+			setTimeout( function () {
+				document.addEventListener( 'click', outsideClick, { once: true } );
+			}, 0 );
+		}
+
+		shareBtn.addEventListener( 'click', function ( e ) {
+			e.stopPropagation();
+			navigator.clipboard.writeText( window.location.href ).then( showTooltip );
 		} );
 	}
 

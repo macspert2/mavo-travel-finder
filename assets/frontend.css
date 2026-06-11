@@ -32,6 +32,80 @@
   font-family: var(--tvf-font);
   font-size: 15px;
   line-height: 1.6;
+  position: relative;
+}
+
+/* ============================================================
+   Share button
+   ============================================================ */
+.tvf-share-btn {
+  position: absolute;
+  top: 2px;
+  right: 24px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid var(--tvf-border);
+  background: var(--tvf-white);
+  color: var(--tvf-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--tvf-transition),
+    border-color var(--tvf-transition),
+    color var(--tvf-transition),
+    box-shadow var(--tvf-transition);
+  z-index: 10;
+}
+
+.tvf-share-btn:hover {
+  background: var(--tvf-accent-light);
+  border-color: var(--tvf-accent);
+  color: var(--tvf-accent);
+  box-shadow: 0 3px 10px rgba(224, 123, 84, 0.2);
+}
+
+.tvf-share-btn.is-copied {
+  background: var(--tvf-accent);
+  border-color: var(--tvf-accent);
+  color: var(--tvf-white);
+}
+
+/* Tooltip */
+@keyframes tvf-tooltip-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tvf-share-tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: var(--tvf-text);
+  color: var(--tvf-white);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  animation: tvf-tooltip-in 0.18s ease both;
+}
+
+/* Caret pointing up toward the button */
+.tvf-share-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 10px;
+  border: 6px solid transparent;
+  border-bottom-color: var(--tvf-text);
 }
 
 /* ============================================================
@@ -158,6 +232,11 @@
 
 .tvf-chip:active {
   transform: translateY(0);
+}
+
+.tvf-chip.is-dead {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .tvf-chip.is-on {

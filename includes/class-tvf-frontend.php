@@ -104,7 +104,9 @@ class TVF_Frontend {
 		$registry = tvf_get_registry();
 		$base_url = self::base_url();
 
-		$intro = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
+		$intro      = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
+		$cards      = self::render_cards( $selected, $lang, 0 );
+		$dead_slugs = $cards['dead_slugs'] ?? [];
 
 		ob_start();
 		?>
@@ -115,6 +117,22 @@ class TVF_Frontend {
 
 		<div class="tvf-wrap" id="tvf-wrap" data-lang="<?php echo esc_attr( $lang ); ?>">
 
+			<button type="button" class="tvf-share-btn" id="tvf-share"
+					aria-label="<?php esc_attr_e( 'Partager', 'travel-finder' ); ?>">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+					 stroke="currentColor" stroke-width="2"
+					 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="18" cy="5" r="3"/>
+					<circle cx="6" cy="12" r="3"/>
+					<circle cx="18" cy="19" r="3"/>
+					<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+					<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+				</svg>
+				<span class="tvf-share-tooltip" id="tvf-share-tooltip" role="status" hidden>
+					<?php esc_html_e( 'URL copiée — partagez par e-mail, message ou réseau social !', 'travel-finder' ); ?>
+				</span>
+			</button>
+
 			<div class="tvf-intro"><?php echo esc_html( $intro ); ?></div>
 
 			<div class="tvf-summary" id="tvf-summary" aria-live="polite">
@@ -122,7 +140,7 @@ class TVF_Frontend {
 			</div>
 
 			<div class="tvf-filters" id="tvf-filters">
-				<?php echo self::render_filters( $selected, $registry, $base_url ); ?>
+				<?php echo self::render_filters( $selected, $registry, $base_url, $dead_slugs ); ?>
 			</div>
 
 			<div class="tvf-results-bar">
@@ -138,12 +156,8 @@ class TVF_Frontend {
 				<?php endif; ?>
 			</div>
 
-			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>
-
 			<div id="tvf-results" class="tvf-results">
-				<div class="tvf-cards-grid" id="tvf-cards-grid">
-					<?php echo $cards['html']; ?>
-				</div>
+				<?php echo $cards['html']; ?>
 			</div>
 
 			<div id="tvf-load-more-wrap" class="tvf-load-more-wrap"<?php echo $cards['has_more'] ? '' : ' hidden'; ?>>
@@ -161,13 +175,13 @@ class TVF_Frontend {
 	// Render helpers
 	// -------------------------------------------------------------------------
 
-	private static function render_filters( array $selected, array $registry, string $base_url ): string {
+	private static function render_filters( array $selected, array $registry, string $base_url, array $dead_slugs = [] ): string {
 		ob_start();
 
 		// Row 1 — Intérêt
 		echo '<div class="tvf-filter-row tvf-row-interet">';
 		foreach ( $registry['interet']['filters'] as $slug => $label ) {
-			echo self::chip_html( $slug, $label, $selected, $base_url );
+			echo self::chip_html( $slug, $label, $selected, $base_url, $dead_slugs );
 		}
 		echo '</div>';
 
@@ -181,7 +195,7 @@ class TVF_Frontend {
 			echo '<span class="tvf-group-label">' . esc_html( $cat['label'] ) . '</span>';
 			echo '<div class="tvf-group-chips">';
 			foreach ( $cat['filters'] as $slug => $label ) {
-				echo self::chip_html( $slug, $label, $selected, $base_url );
+				echo self::chip_html( $slug, $label, $selected, $base_url, $dead_slugs );
 			}
 			echo '</div></div>';
 		}
@@ -190,8 +204,9 @@ class TVF_Frontend {
 		return ob_get_clean();
 	}
 
-	private static function chip_html( string $slug, string $label, array $selected, string $base_url ): string {
+	private static function chip_html( string $slug, string $label, array $selected, string $base_url, array $dead_slugs = [] ): string {
 		$is_on        = in_array( $slug, $selected, true );
+		$is_dead      = ! $is_on && in_array( $slug, $dead_slugs, true );
 		$new_selected = $is_on
 			? array_values( array_diff( $selected, [ $slug ] ) )
 			: array_merge( $selected, [ $slug ] );
@@ -200,10 +215,12 @@ class TVF_Frontend {
 			: add_query_arg( 'f', implode( ',', $new_selected ), $base_url );
 
 		return sprintf(
-			'<a href="%s" class="tvf-chip%s" role="checkbox" aria-checked="%s" data-slug="%s">%s</a>',
+			'<a href="%s" class="tvf-chip%s%s" role="checkbox" aria-checked="%s"%s data-slug="%s">%s</a>',
 			esc_url( $url ),
-			$is_on ? ' is-on' : '',
-			$is_on ? 'true' : 'false',
+			$is_on   ? ' is-on'   : '',
+			$is_dead ? ' is-dead' : '',
+			$is_on   ? 'true'     : 'false',
+			$is_dead ? ' aria-disabled="true" tabindex="-1"' : '',
 			esc_attr( $slug ),
 			esc_html( $label )
 		);
@@ -248,14 +265,21 @@ class TVF_Frontend {
 			array_pop( $rows ); // discard the probe row
 		}
 
+		// Compute incompatible filters only on the first page (selection hasn't changed on load-more).
+		$dead_slugs = $offset === 0 ? TVF_Store::compute_dead_slugs( $lang, $slugs ) : null;
+
 		if ( empty( $rows ) ) {
+			// offset=0: wrap no-results in the grid container so JS can replace results.innerHTML uniformly.
+			// offset>0: shouldn't happen in practice; return empty.
+			$inner = $offset === 0
+				? '<p class="tvf-no-results">'
+					. esc_html__( 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.', 'travel-finder' )
+					. '</p>'
+				: '';
 			$result = [
-				'html'     => $offset === 0
-					? '<p class="tvf-no-results">'
-						. esc_html__( 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.', 'travel-finder' )
-						. '</p>'
-					: '',
-				'has_more' => false,
+				'html'       => $offset === 0 ? '<div class="tvf-cards-grid">' . $inner . '</div>' : '',
+				'has_more'   => false,
+				'dead_slugs' => $dead_slugs,
 			];
 			set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 			return $result;
@@ -282,7 +306,15 @@ class TVF_Frontend {
 			echo '</a></article>';
 		}
 
-		$result = [ 'html' => ob_get_clean(), 'has_more' => $has_more ];
+		$articles_html = ob_get_clean();
+
+		// offset=0 (filter change): include the grid wrapper — JS replaces results.innerHTML with this.
+		// offset>0 (load more):     bare articles only — JS appends these to the existing grid.
+		$html = $offset === 0
+			? '<div class="tvf-cards-grid">' . $articles_html . '</div>'
+			: $articles_html;
+
+		$result = [ 'html' => $html, 'has_more' => $has_more, 'dead_slugs' => $dead_slugs ];
 		set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 		return $result;
 	}

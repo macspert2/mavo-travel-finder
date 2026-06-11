@@ -145,6 +145,85 @@ class TVF_Store {
 	}
 
 	// -------------------------------------------------------------------------
+	// Dead-filter detection
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns slugs of unselected filters that would produce 0 results if added
+	 * to the current selection. Used to grey out incompatible chips.
+	 *
+	 * @param string   $lang
+	 * @param string[] $selected_slugs Currently active filters.
+	 * @return string[] Dead (would-be-empty) filter slugs.
+	 */
+	public static function compute_dead_slugs( string $lang, array $selected_slugs ): array {
+		global $wpdb;
+		$table      = self::table_name();
+		$all_slugs  = tvf_get_all_slugs();
+		$candidates = array_values( array_diff( $all_slugs, $selected_slugs ) );
+
+		if ( empty( $candidates ) ) {
+			return [];
+		}
+
+		$cand_ph = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+
+		if ( empty( $selected_slugs ) ) {
+			// No active filters — dead = slugs with no qualifying published posts at all.
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$alive = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT pf.filter_slug
+					 FROM {$table} pf
+					 JOIN {$wpdb->posts} p ON p.ID = pf.post_id
+					    AND p.post_status = 'publish' AND p.post_type = 'post'
+					 WHERE pf.lang = %s
+					   AND pf.filter_slug IN ({$cand_ph})
+					   AND pf.weight > 0",
+					...array_merge( [ $lang ], $candidates )
+				)
+			) ?: [];
+			return array_values( array_diff( $candidates, $alive ) );
+		}
+
+		// With active filters — dead = adding this candidate yields 0 results.
+		$sel_ph = implode( ',', array_fill( 0, count( $selected_slugs ), '%s' ) );
+		$args   = array_merge(
+			[ $lang ],
+			$candidates,
+			[ $lang ],
+			$selected_slugs,
+			[ count( $selected_slugs ) ]
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$alive = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT pf.filter_slug
+				 FROM {$table} pf
+				 JOIN {$wpdb->posts} p ON p.ID = pf.post_id
+				    AND p.post_status = 'publish' AND p.post_type = 'post'
+				 WHERE pf.lang = %s
+				   AND pf.filter_slug IN ({$cand_ph})
+				   AND pf.weight > 0
+				   AND pf.post_id IN (
+				       SELECT pf2.post_id
+				       FROM {$table} pf2
+				       WHERE pf2.lang = %s
+				         AND pf2.filter_slug IN ({$sel_ph})
+				         AND pf2.weight > 0
+				       GROUP BY pf2.post_id
+				       HAVING COUNT(DISTINCT pf2.filter_slug) = %d
+				   )
+				 GROUP BY pf.filter_slug",
+				...$args
+			)
+		) ?: [];
+
+		return array_values( array_diff( $candidates, $alive ) );
+	}
+
+	// -------------------------------------------------------------------------
 	// Coverage
 	// -------------------------------------------------------------------------
 
