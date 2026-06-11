@@ -261,7 +261,7 @@ class TVF_Store {
 	public static function bust_cache( string $lang ): void {
 		global $wpdb;
 
-		foreach ( [ 'tvf_r2_', 'tvf_dead_' ] as $prefix_base ) {
+		foreach ( [ 'tvf_r3_', 'tvf_dead_' ] as $prefix_base ) {
 			foreach ( [ '_transient_', '_transient_timeout_' ] as $type ) {
 				$wpdb->query(
 					$wpdb->prepare(

@@ -258,7 +258,7 @@ class TVF_Frontend {
 	 */
 	public static function render_cards( array $slugs, string $lang, int $offset = 0 ): array {
 		sort( $slugs ); // canonical order for consistent cache keys
-		$cache_key = 'tvf_r2_' . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
+		$cache_key = 'tvf_r3_' . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
