@@ -1,0 +1,293 @@
+/* ============================================================
+   Travel Finder — Admin styles
+   ============================================================ */
+
+/* ---- Layout ------------------------------------------------ */
+
+.tvf-admin-wrap {
+  max-width: 1100px;
+}
+
+.tvf-lang-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 24px;
+}
+
+.tvf-lang-tab {
+  display: inline-block;
+  padding: 6px 18px;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid #c3c4c7;
+  border-bottom: none;
+  background: #f0f0f1;
+  color: #3c434a;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.tvf-lang-tab.is-active {
+  background: #fff;
+  color: #e07b54;
+  border-bottom: 1px solid #fff;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Pickers ----------------------------------------------- */
+
+.tvf-picker-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.tvf-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 280px;
+  flex: 1;
+}
+
+.tvf-picker label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #646970;
+}
+
+.tvf-picker-input-wrap {
+  position: relative;
+}
+
+/* ---- Autocomplete suggestions ----------------------------- */
+
+.tvf-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.tvf-suggestions li {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.tvf-suggestions li:hover {
+  background: #f0f6fc;
+  color: #e07b54;
+}
+
+/* ---- Action bar -------------------------------------------- */
+
+.tvf-grid-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tvf-save-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: #00a32a;
+  margin-left: 8px;
+}
+
+.tvf-save-msg.is-error {
+  color: #d63638;
+}
+
+/* ---- Weights table ----------------------------------------- */
+
+.tvf-weights-table {
+  table-layout: fixed;
+  margin-top: 0;
+}
+
+.tvf-col-cat    { width: 140px; }
+.tvf-col-filter { }
+.tvf-col-tpl    { width: 80px;  text-align: center; }
+.tvf-col-val    { width: 140px; }
+
+.tvf-cat-cell {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e07b54;
+  vertical-align: top;
+  padding-top: 12px !important;
+  border-right: 2px solid #f0ece6;
+}
+
+.tvf-tpl-val {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #3c434a;
+}
+
+/* ---- Segmented controls ------------------------------------ */
+
+.tvf-segmented {
+  display: inline-flex;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tvf-seg {
+  width: 36px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #c3c4c7;
+  background: #f6f7f7;
+  color: #3c434a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1;
+}
+
+.tvf-seg:last-child {
+  border-right: none;
+}
+
+.tvf-seg:hover {
+  background: #f0ece6;
+  color: #e07b54;
+}
+
+.tvf-seg.is-active {
+  background: #e07b54;
+  color: #fff;
+}
+
+.tvf-seg.is-active[data-val="1"] {
+  background: #f0a882;
+}
+
+.tvf-seg.is-active[data-val="2"] {
+  background: #c8552e;
+}
+
+/* ---- Badges ----------------------------------------------- */
+
+.tvf-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tvf-badge-empty {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.tvf-badge-partial {
+  background: #fff3cd;
+  color: #664d03;
+}
+
+.tvf-badge-complete {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+/* ---- Meta box --------------------------------------------- */
+
+.tvf-metabox {
+  padding: 4px 0;
+}
+
+.tvf-mb-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f1;
+  flex-wrap: wrap;
+}
+
+.tvf-mb-copy-row .tvf-picker-input-wrap {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tvf-mb-category {
+  margin-bottom: 16px;
+}
+
+.tvf-mb-cat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e07b54;
+  margin: 0 0 8px;
+  padding: 0;
+  border: none;
+}
+
+.tvf-mb-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.tvf-mb-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  flex: 1;
+}
+
+.tvf-mb-filter-label {
+  font-size: 13px;
+  color: #3c434a;
+  min-width: 140px;
+  flex: 1;
+}
+
+/* ---- Coverage table --------------------------------------- */
+
+.tvf-coverage-table td:first-child a {
+  font-weight: 500;
+  color: #1d2327;
+  text-decoration: none;
+}
+
+.tvf-coverage-table td:first-child a:hover {
+  color: #e07b54;
+  text-decoration: underline;
+}

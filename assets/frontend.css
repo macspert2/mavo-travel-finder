@@ -1,0 +1,428 @@
+/* ============================================================
+   Travel Finder — Frontend
+   Warm editorial aesthetic · French family travel
+   ============================================================ */
+
+:root {
+  --tvf-bg:           #faf8f5;
+  --tvf-text:         #1a1a2e;
+  --tvf-accent:       #e07b54;
+  --tvf-accent-light: #f5d9cc;
+  --tvf-muted:        #8b8680;
+  --tvf-border:       #d0ccc8;
+  --tvf-cream:        #f0ece6;
+  --tvf-white:        #ffffff;
+  --tvf-shadow:       0 4px 24px rgba(26, 26, 46, 0.09);
+  --tvf-shadow-hover: 0 12px 40px rgba(26, 26, 46, 0.18);
+  --tvf-radius-card:  12px;
+  --tvf-radius-chip:  100px;
+  --tvf-transition:   0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --tvf-font:         -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+/* ============================================================
+   Wrap
+   ============================================================ */
+.tvf-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  background: var(--tvf-bg);
+  color: var(--tvf-text);
+  font-family: var(--tvf-font);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.tvf-header {
+  padding: 56px 0 40px;
+  border-bottom: 1.5px solid var(--tvf-cream);
+  margin-bottom: 36px;
+  position: relative;
+}
+
+.tvf-header::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: var(--tvf-accent);
+  border-radius: 2px;
+  margin-bottom: 20px;
+}
+
+.tvf-title {
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--tvf-text);
+  margin: 0 0 12px;
+}
+
+.tvf-intro {
+  font-size: 16px;
+  color: var(--tvf-muted);
+  margin: 0;
+  max-width: 560px;
+  font-weight: 400;
+  line-height: 1.65;
+}
+
+/* ============================================================
+   Summary bar
+   ============================================================ */
+.tvf-summary {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--tvf-cream);
+  border-bottom: 1px solid var(--tvf-border);
+  padding: 10px 24px;
+  margin: 0 -24px 28px;
+  font-size: 13px;
+  color: var(--tvf-text);
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  transition: box-shadow var(--tvf-transition);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tvf-summary strong {
+  font-weight: 600;
+  color: var(--tvf-accent);
+  margin-right: 2px;
+}
+
+.tvf-summary-empty {
+  color: var(--tvf-muted);
+  font-style: italic;
+}
+
+/* ============================================================
+   Filter rows
+   ============================================================ */
+.tvf-filter-row {
+  margin-bottom: 20px;
+}
+
+.tvf-row-interet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--tvf-cream);
+}
+
+.tvf-row-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  margin-bottom: 36px;
+}
+
+.tvf-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tvf-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tvf-muted);
+}
+
+.tvf-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ============================================================
+   Chips
+   ============================================================ */
+.tvf-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border-radius: var(--tvf-radius-chip);
+  border: 1.5px solid var(--tvf-border);
+  background: var(--tvf-white);
+  color: var(--tvf-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--tvf-transition),
+    border-color var(--tvf-transition),
+    color var(--tvf-transition),
+    transform var(--tvf-transition),
+    box-shadow var(--tvf-transition);
+  white-space: nowrap;
+  min-height: 36px;
+  user-select: none;
+  -webkit-user-select: none;
+  line-height: 1;
+}
+
+.tvf-chip:hover {
+  background: var(--tvf-accent-light);
+  border-color: var(--tvf-accent);
+  color: var(--tvf-text);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(224, 123, 84, 0.2);
+  text-decoration: none;
+}
+
+.tvf-chip:active {
+  transform: translateY(0);
+}
+
+.tvf-chip.is-on {
+  background: var(--tvf-accent);
+  border-color: var(--tvf-accent);
+  color: var(--tvf-white);
+  box-shadow: 0 3px 12px rgba(224, 123, 84, 0.35);
+}
+
+.tvf-chip.is-on:hover {
+  background: #d0673f;
+  border-color: #d0673f;
+  color: var(--tvf-white);
+}
+
+/* ============================================================
+   Results bar
+   ============================================================ */
+.tvf-results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--tvf-cream);
+}
+
+.tvf-result-count,
+.tvf-result-count-inner {
+  font-size: 13px;
+  color: var(--tvf-muted);
+  font-weight: 500;
+}
+
+.tvf-result-count-inner {
+  display: block;
+  margin-bottom: 20px;
+  padding: 0;
+}
+
+.tvf-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tvf-muted);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color var(--tvf-transition), background var(--tvf-transition);
+  font-family: var(--tvf-font);
+}
+
+.tvf-reset-btn::before {
+  content: '\00d7';
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tvf-reset-btn:hover {
+  color: var(--tvf-accent);
+  background: var(--tvf-accent-light);
+  text-decoration: none;
+}
+
+/* ============================================================
+   Cards grid
+   ============================================================ */
+.tvf-cards-grid {
+  display: grid;
+  grid-template-columns: repeat( auto-fill, minmax( min(240px, 100%), 1fr ) );
+  gap: 24px;
+}
+
+/* ============================================================
+   Card
+   ============================================================ */
+.tvf-card {
+  border-radius: var(--tvf-radius-card);
+  overflow: hidden;
+  background: var(--tvf-white);
+  box-shadow: var(--tvf-shadow);
+  transition: box-shadow var(--tvf-transition), transform var(--tvf-transition);
+  will-change: transform;
+}
+
+.tvf-card:hover {
+  box-shadow: var(--tvf-shadow-hover);
+  transform: translateY(-4px);
+}
+
+.tvf-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+}
+
+.tvf-card-img {
+  aspect-ratio: 3 / 2;
+  background-size: cover;
+  background-position: center;
+  display: block;
+}
+
+.tvf-card-img--no-thumb {
+  background: linear-gradient(135deg, var(--tvf-cream) 0%, var(--tvf-border) 100%);
+}
+
+.tvf-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 40px 16px 16px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.3) 60%,
+    transparent 100%
+  );
+  border-radius: 0 0 var(--tvf-radius-card) var(--tvf-radius-card);
+}
+
+.tvf-card-title {
+  color: var(--tvf-white);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   Empty / no-results
+   ============================================================ */
+.tvf-no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--tvf-muted);
+  font-size: 16px;
+  font-style: italic;
+}
+
+/* ============================================================
+   Loading skeleton
+   ============================================================ */
+@keyframes tvf-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+.tvf-loading .tvf-card {
+  pointer-events: none;
+}
+
+.tvf-loading .tvf-card-img {
+  background-image: none !important;
+  background: linear-gradient(
+    90deg,
+    var(--tvf-cream) 25%,
+    var(--tvf-border) 50%,
+    var(--tvf-cream) 75%
+  );
+  background-size: 600px 100%;
+  animation: tvf-shimmer 1.4s ease-in-out infinite;
+}
+
+.tvf-loading .tvf-card-overlay,
+.tvf-loading .tvf-card-title {
+  opacity: 0;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media ( max-width: 900px ) {
+  .tvf-cards-grid {
+    grid-template-columns: repeat( 2, 1fr );
+  }
+}
+
+@media ( max-width: 640px ) {
+  .tvf-wrap {
+    padding: 0 16px 60px;
+  }
+
+  .tvf-header {
+    padding: 36px 0 28px;
+    margin-bottom: 24px;
+  }
+
+  .tvf-summary {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .tvf-row-secondary {
+    gap: 16px 20px;
+  }
+
+  .tvf-chip {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 9px 18px;
+  }
+}
+
+@media ( max-width: 480px ) {
+  .tvf-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tvf-row-secondary {
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
+/* ============================================================
+   Reduced motion
+   ============================================================ */
+@media ( prefers-reduced-motion: reduce ) {
+  .tvf-chip,
+  .tvf-card,
+  .tvf-reset-btn {
+    transition: none;
+  }
+  .tvf-loading .tvf-card-img {
+    animation: none;
+  }
+}
