@@ -10,6 +10,7 @@
 	const lang         = wrap.dataset.lang || 'fr';
 	const results      = document.getElementById( 'tvf-results' );
 	const summary      = document.getElementById( 'tvf-summary' );
+	const summaryText  = document.getElementById( 'tvf-summary-text' );
 	const resetBtn     = document.getElementById( 'tvf-reset' );
 	const loadMoreWrap = document.getElementById( 'tvf-load-more-wrap' );
 	const loadMoreBtn  = document.getElementById( 'tvf-load-more' );
@@ -160,15 +161,16 @@
 	// -------------------------------------------------------------------------
 
 	function updateSummary( slugs ) {
+		const el = summaryText || summary;
 		if ( ! slugs.length ) {
-			summary.innerHTML = '<span class="tvf-summary-empty">'
+			el.innerHTML = '<span class="tvf-summary-empty">'
 				+ escHtml( summary.dataset.emptyText || 'Aucun filtre sélectionné — destinations populaires.' )
 				+ '</span>';
 			return;
 		}
 		const labels = [];
 		wrap.querySelectorAll( '.tvf-chip.is-on' ).forEach( c => labels.push( c.textContent.trim() ) );
-		summary.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
+		el.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
 	}
 
 	function updateResetBtn( slugs ) {

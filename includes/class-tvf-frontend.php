@@ -139,16 +139,10 @@ class TVF_Frontend {
 				</button>
 			</div>
 
-			<div class="tvf-summary" id="tvf-summary" aria-live="polite">
-				<?php echo self::render_summary( $selected, $registry ); ?>
-			</div>
-
-			<div class="tvf-filters" id="tvf-filters">
-				<?php echo self::render_filters( $selected, $registry, $base_url, $dead_slugs ); ?>
-			</div>
-
-			<div class="tvf-results-bar">
-				<span id="tvf-result-count" class="tvf-result-count"></span>
+			<div class="tvf-summary" id="tvf-summary">
+				<span id="tvf-summary-text" aria-live="polite">
+					<?php echo self::render_summary( $selected, $registry ); ?>
+				</span>
 				<?php if ( $selected ) : ?>
 					<a href="<?php echo esc_url( $base_url ); ?>" class="tvf-reset-btn" id="tvf-reset">
 						<?php esc_html_e( 'Réinitialiser', 'travel-finder' ); ?>
@@ -158,6 +152,10 @@ class TVF_Frontend {
 						<?php esc_html_e( 'Réinitialiser', 'travel-finder' ); ?>
 					</button>
 				<?php endif; ?>
+			</div>
+
+			<div class="tvf-filters" id="tvf-filters">
+				<?php echo self::render_filters( $selected, $registry, $base_url, $dead_slugs ); ?>
 			</div>
 
 			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>

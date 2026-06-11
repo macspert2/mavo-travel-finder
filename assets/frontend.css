@@ -153,6 +153,8 @@
   min-height: 38px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   transition: box-shadow var(--tvf-transition);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -269,25 +271,6 @@
   background: #d0673f;
   border-color: #d0673f;
   color: var(--tvf-white);
-}
-
-/* ============================================================
-   Results bar
-   ============================================================ */
-.tvf-results-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--tvf-cream);
-}
-
-.tvf-result-count {
-  font-size: 13px;
-  color: var(--tvf-muted);
-  font-weight: 500;
 }
 
 .tvf-reset-btn {
