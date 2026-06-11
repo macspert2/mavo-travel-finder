@@ -10,9 +10,10 @@ class TVF_Admin {
 		add_action( 'admin_menu',             [ __CLASS__, 'add_menu' ] );
 		add_action( 'add_meta_boxes',         [ __CLASS__, 'add_meta_box' ] );
 		add_action( 'save_post',              [ __CLASS__, 'save_meta_box' ] );
-		add_action( 'wp_ajax_tvf_save',       [ __CLASS__, 'ajax_save' ] );
-		add_action( 'wp_ajax_tvf_get_weights',[ __CLASS__, 'ajax_get_weights' ] );
-		add_action( 'admin_enqueue_scripts',  [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'wp_ajax_tvf_save',        [ __CLASS__, 'ajax_save' ] );
+		add_action( 'wp_ajax_tvf_get_weights', [ __CLASS__, 'ajax_get_weights' ] );
+		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'admin_post_tvf_clear_cache', [ __CLASS__, 'handle_clear_cache' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -101,6 +102,12 @@ class TVF_Admin {
 		<div class="wrap tvf-admin-wrap">
 			<h1><?php esc_html_e( 'Travel Finder — Modifier les poids', 'travel-finder' ); ?></h1>
 
+			<?php if ( isset( $_GET['tvf_cleared'] ) ) : ?>
+				<div class="notice notice-success is-dismissible">
+					<p><?php esc_html_e( 'Cache vidé — les résultats seront régénérés à la prochaine visite.', 'travel-finder' ); ?></p>
+				</div>
+			<?php endif; ?>
+
 			<div class="tvf-lang-tabs">
 				<?php foreach ( [ 'fr' => 'FR', 'en' => 'EN', 'de' => 'DE' ] as $l => $label ) : ?>
 					<a href="<?php echo esc_url( add_query_arg( 'lang', $l ) ); ?>"
@@ -108,6 +115,14 @@ class TVF_Admin {
 						<?php echo esc_html( $label ); ?>
 					</a>
 				<?php endforeach; ?>
+
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-left:auto">
+					<?php wp_nonce_field( 'tvf_clear_cache', 'tvf_cache_nonce' ); ?>
+					<input type="hidden" name="action" value="tvf_clear_cache">
+					<button type="submit" class="button tvf-lang-tab">
+						<?php esc_html_e( 'Vider le cache', 'travel-finder' ); ?>
+					</button>
+				</form>
 			</div>
 
 			<div class="tvf-picker-row">
@@ -463,5 +478,28 @@ class TVF_Admin {
 		}
 
 		wp_send_json_success( TVF_Store::get_weights( $post_id, $lang ) );
+	}
+
+	// -------------------------------------------------------------------------
+	// Cache management
+	// -------------------------------------------------------------------------
+
+	public static function handle_clear_cache(): void {
+		check_admin_referer( 'tvf_clear_cache', 'tvf_cache_nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+
+		foreach ( [ 'fr', 'en', 'de' ] as $lang ) {
+			TVF_Store::bust_cache( $lang );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				[ 'page' => 'travel-finder', 'tvf_cleared' => '1' ],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 }

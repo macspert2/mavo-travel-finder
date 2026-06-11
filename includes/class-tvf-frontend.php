@@ -37,8 +37,9 @@ class TVF_Frontend {
 			'callback'            => [ __CLASS__, 'rest_results' ],
 			'permission_callback' => '__return_true',
 			'args'                => [
-				'f'    => [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ],
-				'lang' => [ 'sanitize_callback' => 'sanitize_key',        'default' => 'fr' ],
+				'f'      => [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ],
+				'lang'   => [ 'sanitize_callback' => 'sanitize_key',        'default' => 'fr' ],
+				'offset' => [ 'sanitize_callback' => 'absint',              'default' => 0 ],
 			],
 		] );
 
@@ -54,14 +55,15 @@ class TVF_Frontend {
 	}
 
 	public static function rest_results( WP_REST_Request $request ): WP_REST_Response {
-		$lang = $request->get_param( 'lang' );
+		$lang   = $request->get_param( 'lang' );
+		$offset = (int) $request->get_param( 'offset' );
 		if ( ! in_array( $lang, [ 'fr', 'en', 'de' ], true ) ) {
 			$lang = 'fr';
 		}
-		$slugs = self::parse_filter_param( $request->get_param( 'f' ) );
-		$html  = self::render_cards( $slugs, $lang );
+		$slugs  = self::parse_filter_param( $request->get_param( 'f' ) );
+		$result = self::render_cards( $slugs, $lang, $offset );
 
-		return new WP_REST_Response( [ 'html' => $html ], 200 );
+		return new WP_REST_Response( $result, 200 );
 	}
 
 	public static function rest_search_posts( WP_REST_Request $request ): WP_REST_Response {
@@ -136,8 +138,18 @@ class TVF_Frontend {
 				<?php endif; ?>
 			</div>
 
+			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>
+
 			<div id="tvf-results" class="tvf-results">
-				<?php echo self::render_cards( $selected, $lang ); ?>
+				<div class="tvf-cards-grid" id="tvf-cards-grid">
+					<?php echo $cards['html']; ?>
+				</div>
+			</div>
+
+			<div id="tvf-load-more-wrap" class="tvf-load-more-wrap"<?php echo $cards['has_more'] ? '' : ' hidden'; ?>>
+				<button type="button" class="tvf-load-more-btn" id="tvf-load-more">
+					<?php esc_html_e( 'Voir plus', 'travel-finder' ); ?>
+				</button>
 			</div>
 
 		</div>
@@ -213,34 +225,45 @@ class TVF_Frontend {
 	}
 
 	/**
-	 * Renders the 16-card grid HTML, cached in a transient.
-	 * Also used by the REST endpoint to return fresh HTML.
+	 * Renders a page of card <article> elements, cached in a transient.
+	 * Returns ['html' => string, 'has_more' => bool].
+	 * Queries BATCH+1 rows; if 43 come back, has_more=true and only 42 are rendered.
 	 *
 	 * @param string[] $slugs
+	 * @param string   $lang
+	 * @param int      $offset 0-based row offset (multiples of 42).
+	 * @return array{html: string, has_more: bool}
 	 */
-	public static function render_cards( array $slugs, string $lang ): string {
+	public static function render_cards( array $slugs, string $lang, int $offset = 0 ): array {
 		sort( $slugs ); // canonical order for consistent cache keys
-		$cache_key = 'tvf_results_' . $lang . '_' . md5( implode( ',', $slugs ) );
+		$cache_key = 'tvf_r2_' . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
 		$cached    = get_transient( $cache_key );
-		if ( false !== $cached ) {
+		if ( is_array( $cached ) ) {
 			return $cached;
 		}
 
-		$rows = TVF_Store::query_results( $lang, $slugs );
+		$rows     = TVF_Store::query_results( $lang, $slugs, $offset );
+		$has_more = count( $rows ) > 42;
+		if ( $has_more ) {
+			array_pop( $rows ); // discard the probe row
+		}
 
 		if ( empty( $rows ) ) {
-			$html = '<p class="tvf-no-results">'
-				. esc_html__( 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.', 'travel-finder' )
-				. '</p>';
-			set_transient( $cache_key, $html, HOUR_IN_SECONDS );
-			return $html;
+			$result = [
+				'html'     => $offset === 0
+					? '<p class="tvf-no-results">'
+						. esc_html__( 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.', 'travel-finder' )
+						. '</p>'
+					: '',
+				'has_more' => false,
+			];
+			set_transient( $cache_key, $result, HOUR_IN_SECONDS );
+			return $result;
 		}
 
 		ob_start();
-		echo '<div class="tvf-cards-grid">';
-
 		foreach ( $rows as $row ) {
-			$post  = get_post( (int) $row['post_id'] );
+			$post = get_post( (int) $row['post_id'] );
 			if ( ! $post ) {
 				continue;
 			}
@@ -259,10 +282,9 @@ class TVF_Frontend {
 			echo '</a></article>';
 		}
 
-		echo '</div>';
-		$html = ob_get_clean();
-		set_transient( $cache_key, $html, HOUR_IN_SECONDS );
-		return $html;
+		$result = [ 'html' => ob_get_clean(), 'has_more' => $has_more ];
+		set_transient( $cache_key, $result, HOUR_IN_SECONDS );
+		return $result;
 	}
 
 	// -------------------------------------------------------------------------

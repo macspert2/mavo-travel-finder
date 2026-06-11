@@ -5,20 +5,24 @@
 	const wrap = document.getElementById( 'tvf-wrap' );
 	if ( ! wrap ) return;
 
-	const restUrl  = tvfFrontend.restUrl;
-	const restNonce = tvfFrontend.nonce;
-	const lang     = wrap.dataset.lang || 'fr';
-	const results  = document.getElementById( 'tvf-results' );
-	const summary  = document.getElementById( 'tvf-summary' );
-	const resetBtn = document.getElementById( 'tvf-reset' );
+	const restUrl      = tvfFrontend.restUrl;
+	const restNonce    = tvfFrontend.nonce;
+	const lang         = wrap.dataset.lang || 'fr';
+	const grid         = document.getElementById( 'tvf-cards-grid' );
+	const summary      = document.getElementById( 'tvf-summary' );
+	const resetBtn     = document.getElementById( 'tvf-reset' );
+	const loadMoreWrap = document.getElementById( 'tvf-load-more-wrap' );
+	const loadMoreBtn  = document.getElementById( 'tvf-load-more' );
+
+	const BATCH = 42;
+	let   nextOffset = BATCH; // offset for the next "load more" fetch
 
 	// -------------------------------------------------------------------------
-	// Parse the current filter state from the URL
+	// URL helpers
 	// -------------------------------------------------------------------------
 
 	function getSelected() {
-		const url = new URL( window.location.href );
-		const f   = url.searchParams.get( 'f' ) || '';
+		const f = new URL( window.location.href ).searchParams.get( 'f' ) || '';
 		return f ? f.split( ',' ).filter( Boolean ) : [];
 	}
 
@@ -38,36 +42,84 @@
 		return u.toString();
 	}
 
+	function restFetchUrl( slugs, offset ) {
+		const u = new URL( restUrl );
+		u.searchParams.set( 'f',      slugs.join( ',' ) );
+		u.searchParams.set( 'lang',   lang );
+		u.searchParams.set( 'offset', String( offset ) );
+		return u.toString();
+	}
+
 	// -------------------------------------------------------------------------
-	// Fetch and swap results
+	// Load-more button state
+	// -------------------------------------------------------------------------
+
+	function setLoadMore( hasMore, offset ) {
+		nextOffset = offset;
+		if ( ! loadMoreWrap ) return;
+		if ( hasMore ) {
+			loadMoreWrap.removeAttribute( 'hidden' );
+		} else {
+			loadMoreWrap.setAttribute( 'hidden', '' );
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Fetch helpers
 	// -------------------------------------------------------------------------
 
 	let controller = null;
 
+	/** Replace grid content with a fresh first page. */
 	function loadResults( slugs ) {
 		if ( controller ) controller.abort();
 		controller = new AbortController();
 
-		results.classList.add( 'tvf-loading' );
+		grid.closest( '.tvf-results' ).classList.add( 'tvf-loading' );
+		setLoadMore( false, BATCH ); // hide button while loading
 
-		const f   = slugs.join( ',' );
-		const url = restUrl + '?f=' + encodeURIComponent( f ) + '&lang=' + lang;
-
-		fetch( url, {
+		fetch( restFetchUrl( slugs, 0 ), {
 			signal:  controller.signal,
 			headers: { 'X-WP-Nonce': restNonce },
 		} )
 			.then( r => r.json() )
 			.then( function ( data ) {
-				results.innerHTML   = data.html || '';
-				results.classList.remove( 'tvf-loading' );
+				grid.innerHTML = data.html || '';
+				grid.closest( '.tvf-results' ).classList.remove( 'tvf-loading' );
+				setLoadMore( data.has_more, BATCH );
 				controller = null;
 				updateResetBtn( slugs );
 			} )
 			.catch( function ( err ) {
 				if ( err.name !== 'AbortError' ) {
-					results.classList.remove( 'tvf-loading' );
+					grid.closest( '.tvf-results' ).classList.remove( 'tvf-loading' );
 				}
+			} );
+	}
+
+	/** Append the next page of cards to the existing grid. */
+	function loadMore( slugs, offset ) {
+		if ( ! loadMoreBtn ) return;
+
+		const originalLabel = loadMoreBtn.textContent;
+		loadMoreBtn.disabled    = true;
+		loadMoreBtn.textContent = '…';
+
+		fetch( restFetchUrl( slugs, offset ), {
+			headers: { 'X-WP-Nonce': restNonce },
+		} )
+			.then( r => r.json() )
+			.then( function ( data ) {
+				if ( data.html ) {
+					grid.insertAdjacentHTML( 'beforeend', data.html );
+				}
+				setLoadMore( data.has_more, offset + BATCH );
+				loadMoreBtn.disabled    = false;
+				loadMoreBtn.textContent = originalLabel;
+			} )
+			.catch( function () {
+				loadMoreBtn.disabled    = false;
+				loadMoreBtn.textContent = originalLabel;
 			} );
 	}
 
@@ -78,12 +130,12 @@
 	function updateSummary( slugs ) {
 		if ( ! slugs.length ) {
 			summary.innerHTML = '<span class="tvf-summary-empty">'
-				+ ( summary.dataset.emptyText || 'Aucun filtre sélectionné — destinations populaires.' )
+				+ escHtml( summary.dataset.emptyText || 'Aucun filtre sélectionné — destinations populaires.' )
 				+ '</span>';
 			return;
 		}
 		const labels = [];
-		wrap.querySelectorAll( '.tvf-chip.is-on' ).forEach( chip => labels.push( chip.textContent.trim() ) );
+		wrap.querySelectorAll( '.tvf-chip.is-on' ).forEach( c => labels.push( c.textContent.trim() ) );
 		summary.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
 	}
 
@@ -127,7 +179,7 @@
 			c.setAttribute( 'aria-checked', idx < 0 ? 'true' : 'false' );
 		} );
 
-		// Update every chip's href to reflect the new selection
+		// Update every chip's href
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
 			const s    = c.dataset.slug;
 			const on   = selected.includes( s );
@@ -137,29 +189,24 @@
 			c.href = buildUrl( next );
 		} );
 
-		// Push URL
 		history.pushState( { f: selected.join( ',' ) }, '', buildUrl( selected ) );
-
 		updateSummary( selected );
 		loadResults( selected );
 	} );
 
-	// Handle browser back/forward
+	// Browser back/forward
 	window.addEventListener( 'popstate', function () {
 		const selected = getSelected();
-
-		// Sync chip states
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
 			const on = selected.includes( c.dataset.slug );
 			c.classList.toggle( 'is-on', on );
 			c.setAttribute( 'aria-checked', on ? 'true' : 'false' );
 		} );
-
 		updateSummary( selected );
 		loadResults( selected );
 	} );
 
-	// Reset button (when rendered as <button> by SSR for the no-selection case)
+	// Reset button (when rendered as <button> for the no-selection state)
 	if ( resetBtn && resetBtn.tagName === 'BUTTON' ) {
 		resetBtn.addEventListener( 'click', function () {
 			history.pushState( { f: '' }, '', baseUrl() );
@@ -169,6 +216,16 @@
 			} );
 			updateSummary( [] );
 			loadResults( [] );
+		} );
+	}
+
+	// -------------------------------------------------------------------------
+	// Load more
+	// -------------------------------------------------------------------------
+
+	if ( loadMoreBtn ) {
+		loadMoreBtn.addEventListener( 'click', function () {
+			loadMore( getSelected(), nextOffset );
 		} );
 	}
 

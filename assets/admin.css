@@ -10,8 +10,10 @@
 
 .tvf-lang-tabs {
   display: flex;
+  align-items: flex-end;
   gap: 4px;
   margin: 16px 0 24px;
+  flex-wrap: wrap;
 }
 
 .tvf-lang-tab {

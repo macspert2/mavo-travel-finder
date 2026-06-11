@@ -49,15 +49,15 @@ class TVF_Store {
 	}
 
 	/**
-	 * Runs the scoring query.
-	 * With no slugs: top 16 travel posts by views.
-	 * With slugs: posts that match at least one filter, ranked score DESC then views DESC.
+	 * Runs the scoring query. Fetches BATCH+1 rows so callers can detect whether
+	 * more results exist beyond the current page.
 	 *
 	 * @param string   $lang
 	 * @param string[] $filter_slugs
+	 * @param int      $offset       0-based row offset for pagination.
 	 * @return array[] rows with keys: post_id, score, views
 	 */
-	public static function query_results( string $lang, array $filter_slugs ): array {
+	public static function query_results( string $lang, array $filter_slugs, int $offset = 0 ): array {
 		global $wpdb;
 		$table = self::table_name();
 
@@ -76,8 +76,9 @@ class TVF_Store {
 					 WHERE pf.lang = %s
 					 GROUP BY pf.post_id
 					 ORDER BY views DESC
-					 LIMIT 42",
-					$lang
+					 LIMIT 43 OFFSET %d",
+					$lang,
+					$offset
 				),
 				ARRAY_A
 			);
@@ -85,8 +86,8 @@ class TVF_Store {
 
 		$count        = count( $filter_slugs );
 		$placeholders = implode( ',', array_fill( 0, $count, '%s' ) );
-		// $lang + N slugs + $count
-		$args = array_merge( [ $lang ], $filter_slugs, [ $count ] );
+		// $lang + N slugs + $count + $offset
+		$args = array_merge( [ $lang ], $filter_slugs, [ $count, $offset ] );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $wpdb->get_results(
@@ -106,7 +107,7 @@ class TVF_Store {
 				 GROUP BY pf.post_id
 				 HAVING COUNT(DISTINCT pf.filter_slug) = %d
 				 ORDER BY score DESC, views DESC
-				 LIMIT 42",
+				 LIMIT 43 OFFSET %d",
 				...$args
 			),
 			ARRAY_A
@@ -178,14 +179,14 @@ class TVF_Store {
 		global $wpdb;
 
 		// Works for both DB-based and APCu/Memcache transients because we delete the option rows.
-		$prefix = '_transient_tvf_results_' . $lang;
+		$prefix = '_transient_tvf_r2_' . $lang;
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
 				$wpdb->esc_like( $prefix ) . '%'
 			)
 		);
-		$prefix_timeout = '_transient_timeout_tvf_results_' . $lang;
+		$prefix_timeout = '_transient_timeout_tvf_r2_' . $lang;
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
