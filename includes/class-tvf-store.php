@@ -76,15 +76,17 @@ class TVF_Store {
 					 WHERE pf.lang = %s
 					 GROUP BY pf.post_id
 					 ORDER BY views DESC
-					 LIMIT 16",
+					 LIMIT 42",
 					$lang
 				),
 				ARRAY_A
 			);
 		}
 
-		$placeholders = implode( ',', array_fill( 0, count( $filter_slugs ), '%s' ) );
-		$args         = array_merge( [ $lang ], $filter_slugs );
+		$count        = count( $filter_slugs );
+		$placeholders = implode( ',', array_fill( 0, $count, '%s' ) );
+		// $lang + N slugs + $count
+		$args = array_merge( [ $lang ], $filter_slugs, [ $count ] );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $wpdb->get_results(
@@ -102,9 +104,9 @@ class TVF_Store {
 				   AND pf.filter_slug IN ({$placeholders})
 				   AND pf.weight > 0
 				 GROUP BY pf.post_id
-				 HAVING score > 0
+				 HAVING COUNT(DISTINCT pf.filter_slug) = %d
 				 ORDER BY score DESC, views DESC
-				 LIMIT 16",
+				 LIMIT 42",
 				...$args
 			),
 			ARRAY_A

@@ -91,10 +91,7 @@ class TVF_Frontend {
 
 	public static function render_shortcode( array $atts = [] ): string {
 		$atts = shortcode_atts(
-			[
-				'title' => '',
-				'intro' => '',
-			],
+			[ 'intro' => '' ],
 			$atts,
 			'travel_finder'
 		);
@@ -105,7 +102,6 @@ class TVF_Frontend {
 		$registry = tvf_get_registry();
 		$base_url = self::base_url();
 
-		$title = $atts['title'] ?: __( 'Trouvez votre prochain voyage', 'travel-finder' );
 		$intro = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
 
 		ob_start();
@@ -117,10 +113,7 @@ class TVF_Frontend {
 
 		<div class="tvf-wrap" id="tvf-wrap" data-lang="<?php echo esc_attr( $lang ); ?>">
 
-			<header class="tvf-header">
-				<h2 class="tvf-title"><?php echo esc_html( $title ); ?></h2>
-				<p class="tvf-intro"><?php echo esc_html( $intro ); ?></p>
-			</header>
+			<div class="tvf-intro"><?php echo esc_html( $intro ); ?></div>
 
 			<div class="tvf-summary" id="tvf-summary" aria-live="polite">
 				<?php echo self::render_summary( $selected, $registry ); ?>
@@ -242,11 +235,6 @@ class TVF_Frontend {
 		}
 
 		ob_start();
-		$count = count( $rows );
-		echo '<p class="tvf-result-count-inner" data-count="' . (int) $count . '">';
-		/* translators: %d: number of results */
-		printf( esc_html( _n( '%d destination trouvée', '%d destinations trouvées', $count, 'travel-finder' ) ), $count );
-		echo '</p>';
 		echo '<div class="tvf-cards-grid">';
 
 		foreach ( $rows as $row ) {
