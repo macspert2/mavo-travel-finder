@@ -144,6 +144,8 @@
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( chip ) {
 			const isDead = deadSlugs.includes( chip.dataset.slug ) && ! chip.classList.contains( 'is-on' );
 			chip.classList.toggle( 'is-dead', isDead );
+			chip.style.opacity = isDead ? '0.35' : '';
+			chip.style.cursor  = isDead ? 'not-allowed' : '';
 			chip.setAttribute( 'aria-disabled', isDead ? 'true' : 'false' );
 			if ( isDead ) {
 				chip.setAttribute( 'tabindex', '-1' );
@@ -190,6 +192,7 @@
 	wrap.addEventListener( 'click', function ( e ) {
 		const chip = e.target.closest( '.tvf-chip' );
 		if ( ! chip ) return;
+		if ( chip.classList.contains( 'is-dead' ) ) return;
 
 		e.preventDefault();
 
@@ -297,7 +300,23 @@
 
 		shareBtn.addEventListener( 'click', function ( e ) {
 			e.stopPropagation();
-			navigator.clipboard.writeText( window.location.href ).then( showTooltip );
+			// Show tooltip immediately — don't wait on the async clipboard promise
+			showTooltip();
+			if ( navigator.clipboard && navigator.clipboard.writeText ) {
+				navigator.clipboard.writeText( window.location.href ).catch( function () {} );
+			} else {
+				// execCommand fallback (older Safari / strict CSP)
+				try {
+					const ta = document.createElement( 'textarea' );
+					ta.value = window.location.href;
+					ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+					document.body.appendChild( ta );
+					ta.focus();
+					ta.select();
+					document.execCommand( 'copy' );
+					document.body.removeChild( ta );
+				} catch ( _e ) {}
+			}
 		} );
 	}
 
