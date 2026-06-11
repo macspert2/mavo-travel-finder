@@ -187,7 +187,8 @@
 .tvf-row-secondary {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px 32px;
+  justify-content: space-between;
+  gap: 20px 0;
   margin-bottom: 36px;
 }
 
@@ -496,7 +497,7 @@
   }
 
   .tvf-row-secondary {
-    gap: 16px 20px;
+    gap: 16px 0;
   }
 
   .tvf-chip {
