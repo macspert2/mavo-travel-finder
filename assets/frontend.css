@@ -43,7 +43,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 28px;
 }
 
 /* ============================================================
@@ -67,6 +66,15 @@
     border-color var(--tvf-transition),
     color var(--tvf-transition),
     box-shadow var(--tvf-transition);
+  z-index: 60;
+}
+
+/* Some themes hide all SVGs globally — restore visibility inside the button */
+.tvf-share-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .tvf-share-btn:hover {
@@ -209,7 +217,7 @@
 .tvf-chip {
   display: inline-flex;
   align-items: center;
-  padding: 7px 16px;
+  padding: 0px 16px;
   border-radius: var(--tvf-radius-chip);
   border: 1.5px solid var(--tvf-border);
   background: var(--tvf-white);
