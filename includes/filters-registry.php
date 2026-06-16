@@ -37,7 +37,7 @@ function tvf_get_registry(): array {
 			'label'   => __( 'Durée', 'travel-finder' ),
 			'order'   => 3,
 			'filters' => [
-				'2_3_jours' => __( '2–3 jours', 'travel-finder' ),
+				'2_3_jours' => __( '2–4 jours', 'travel-finder' ),
 				'semaine'   => __( '1 semaine', 'travel-finder' ),
 				'plus'      => __( "Plus d'une semaine", 'travel-finder' ),
 			],

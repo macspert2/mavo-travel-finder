@@ -108,8 +108,13 @@ class TVF_Frontend {
 		$registry = tvf_get_registry();
 		$base_url = self::base_url();
 
-		$intro      = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
-		$dead_slugs = TVF_Store::compute_dead_slugs( $lang, $selected );
+		$intro         = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
+		$results_title = match ( $lang ) {
+			'en'    => __( 'Travel ideas for you', 'travel-finder' ),
+			'de'    => __( 'Reiseideen für Sie', 'travel-finder' ),
+			default => __( 'Nos idées de voyage pour vous', 'travel-finder' ),
+		};
+		$dead_slugs    = TVF_Store::compute_dead_slugs( $lang, $selected );
 
 		ob_start();
 		?>
@@ -159,6 +164,8 @@ class TVF_Frontend {
 			</div>
 
 			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>
+
+			<h2 class="tvf-results-title"><?php echo esc_html( $results_title ); ?></h2>
 
 			<div id="tvf-results" class="tvf-results">
 				<?php echo $cards['html']; ?>
