@@ -112,7 +112,7 @@ class TVF_Frontend {
 		$results_title = match ( $lang ) {
 			'en'    => __( 'Travel ideas for you', 'travel-finder' ),
 			'de'    => __( 'Reiseideen für Sie', 'travel-finder' ),
-			default => __( 'Nos idées de voyage pour vous', 'travel-finder' ),
+			default => __( 'Nos idées de voyage pour vous :', 'travel-finder' ),
 		};
 		$dead_slugs    = TVF_Store::compute_dead_slugs( $lang, $selected );
 
