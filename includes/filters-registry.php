@@ -104,3 +104,25 @@ function tvf_get_slug_labels(): array {
 	}
 	return $cache;
 }
+
+/**
+ * Parses a comma-separated `f` query value into validated filter_slugs.
+ * Unknown slugs are dropped silently. Shared by TVF_Frontend and TVF_Focus
+ * so both validate `f` the same way.
+ *
+ * @return string[]
+ */
+function tvf_parse_filter_param( string $f ): array {
+	if ( '' === $f ) {
+		return [];
+	}
+	$allowed = array_flip( tvf_get_all_slugs() );
+	$out     = [];
+	foreach ( explode( ',', $f ) as $slug ) {
+		$slug = sanitize_key( trim( $slug ) );
+		if ( isset( $allowed[ $slug ] ) ) {
+			$out[] = $slug;
+		}
+	}
+	return array_values( array_unique( $out ) );
+}

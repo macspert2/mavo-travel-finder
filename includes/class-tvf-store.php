@@ -114,6 +114,37 @@ class TVF_Store {
 		);
 	}
 
+	/**
+	 * Ranked, published WP_Post objects for a slug combination — same
+	 * scoring as query_results(), resolved to post objects in one ordered
+	 * query (post__in + orderby=post__in preserves the ranking).
+	 *
+	 * @param string[] $slugs
+	 * @return WP_Post[]
+	 */
+	public static function resolve_posts_for_slugs( string $lang, array $slugs, int $limit = 9 ): array {
+		if ( empty( $slugs ) ) {
+			return [];
+		}
+
+		$rows = self::query_results( $lang, $slugs, 0 );
+		$rows = array_slice( $rows, 0, $limit );
+
+		if ( empty( $rows ) ) {
+			return [];
+		}
+
+		$ids = array_map( static fn( $row ) => (int) $row['post_id'], $rows );
+
+		return get_posts( [
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'post__in'       => $ids,
+			'orderby'        => 'post__in',
+			'posts_per_page' => count( $ids ),
+		] );
+	}
+
 	// -------------------------------------------------------------------------
 	// Write
 	// -------------------------------------------------------------------------

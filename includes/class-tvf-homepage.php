@@ -21,22 +21,7 @@ class TVF_Homepage {
 			return [];
 		}
 
-		$rows = TVF_Store::query_results( $lang, $entry['slugs'], 0 );
-		$rows = array_slice( $rows, 0, $limit );
-
-		if ( empty( $rows ) ) {
-			return [];
-		}
-
-		$ids = array_map( static fn( $row ) => (int) $row['post_id'], $rows );
-
-		return get_posts( [
-			'post_type'      => 'post',
-			'post_status'    => 'publish',
-			'post__in'       => $ids,
-			'orderby'        => 'post__in',
-			'posts_per_page' => count( $ids ),
-		] );
+		return TVF_Store::resolve_posts_for_slugs( $lang, $entry['slugs'], $limit );
 	}
 
 	/** Catalog entry (label/description/slugs/section) for a key, or null if unknown. */

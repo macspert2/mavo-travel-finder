@@ -338,18 +338,7 @@ class TVF_Frontend {
 	}
 
 	private static function parse_filter_param( string $f ): array {
-		if ( '' === $f ) {
-			return [];
-		}
-		$allowed = array_flip( tvf_get_all_slugs() );
-		$out     = [];
-		foreach ( explode( ',', $f ) as $slug ) {
-			$slug = sanitize_key( trim( $slug ) );
-			if ( isset( $allowed[ $slug ] ) ) {
-				$out[] = $slug;
-			}
-		}
-		return array_values( array_unique( $out ) );
+		return tvf_parse_filter_param( $f );
 	}
 
 	private static function base_url(): string {
