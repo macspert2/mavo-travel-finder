@@ -117,16 +117,15 @@ class TVF_Store {
 	/**
 	 * Ranked, published WP_Post objects for a slug combination — same
 	 * scoring as query_results(), resolved to post objects in one ordered
-	 * query (post__in + orderby=post__in preserves the ranking).
+	 * query (post__in + orderby=post__in preserves the ranking). An empty
+	 * $slugs list is valid here too: query_results() falls back to its
+	 * top-by-views ranking, same as the [travel_finder] page with no
+	 * filters selected.
 	 *
 	 * @param string[] $slugs
 	 * @return WP_Post[]
 	 */
 	public static function resolve_posts_for_slugs( string $lang, array $slugs, int $limit = 9 ): array {
-		if ( empty( $slugs ) ) {
-			return [];
-		}
-
 		$rows = self::query_results( $lang, $slugs, 0 );
 		$rows = array_slice( $rows, 0, $limit );
 

@@ -109,6 +109,11 @@ function tvf_get_homepage_catalog(): array {
 				'description' => __( 'Voyager en famille sans se ruiner.', 'travel-finder' ),
 				'slugs'       => [ 'economique' ],
 			],
+			'budget_medium'     => [
+				'label'       => __( 'Budget moyen', 'travel-finder' ),
+				'description' => __( 'Un bon équilibre entre confort et prix.', 'travel-finder' ),
+				'slugs'       => [ 'medium' ],
+			],
 			'budget_premium'    => [
 				'label'       => __( 'Voyage haut de gamme', 'travel-finder' ),
 				'description' => __( 'Pour les séjours plus confortables.', 'travel-finder' ),

@@ -28,4 +28,16 @@ class TVF_Homepage {
 	public static function get_card_meta( string $key ): ?array {
 		return tvf_get_homepage_catalog_entry( $key );
 	}
+
+	/**
+	 * Top published posts by views, no filter applied — the most-viewed
+	 * posts among those configured in the travel-finder table. A
+	 * reasonable automated stand-in for a manually curated "best articles
+	 * to start with" list.
+	 *
+	 * @return WP_Post[]
+	 */
+	public static function get_top_posts( string $lang = 'fr', int $limit = 6 ): array {
+		return TVF_Store::resolve_posts_for_slugs( $lang, [], $limit );
+	}
 }
