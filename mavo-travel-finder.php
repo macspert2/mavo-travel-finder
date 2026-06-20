@@ -3,7 +3,7 @@
  * Plugin Name: Mavo Travel Finder
  * Plugin URI:  https://mamanvoyage.com
  * Description: Filter and rank travel posts by weighted criteria. Drop [travel_finder] on any page.
- * Version:     1.5.12
+ * Version:     1.5.13
  * Author:      Mavo
  * Text Domain: travel-finder
  * Domain Path: /languages
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'TVF_VERSION',    '1.5.12' );
+define( 'TVF_VERSION',    '1.5.13' );
 define( 'TVF_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TVF_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

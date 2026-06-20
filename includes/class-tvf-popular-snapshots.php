@@ -60,25 +60,46 @@ class TVF_Popular_Snapshots {
 	}
 
 	/**
-	 * Top posts for the most recent available snapshot month, in a given
-	 * language — a fallback for when "last year, same month" has no
-	 * data at all (e.g. German view tracking started more recently than
-	 * a year ago). Returns [] if the table has no data yet either.
+	 * Top published posts by all-time view count (wp_postmeta
+	 * meta_key='views'), filtered by language — a fallback for when
+	 * "last year, same month" has no snapshot data at all. Tried and
+	 * replaced an earlier "most recent snapshot month" fallback that
+	 * still relied on the same thin snapshot table and could return as
+	 * little as 1 EN / 0 DE post after language filtering; this draws
+	 * from every published post's all-time view count instead, which
+	 * doesn't depend on the snapshot table's (or wp_tvf_post_filter's)
+	 * language coverage at all.
+	 *
+	 * Overfetches a generous top-200 by views before language-filtering,
+	 * since most of that 200 will likely be French — narrowing first
+	 * would risk losing EN/DE posts that rank lower site-wide but are
+	 * still that language's most-viewed.
 	 *
 	 * @return WP_Post[]
 	 */
-	public static function get_currently_popular( string $lang = 'fr', int $limit = 6 ): array {
-		$month = self::most_recent_month();
-		if ( ! $month ) {
+	public static function get_most_viewed( string $lang = 'fr', int $limit = 6 ): array {
+		global $wpdb;
+
+		$ids = $wpdb->get_col(
+			"SELECT p.ID
+			 FROM {$wpdb->posts} p
+			 JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = 'views'
+			 WHERE p.post_status = 'publish' AND p.post_type = 'post'
+			 ORDER BY CAST( pm.meta_value AS UNSIGNED ) DESC
+			 LIMIT 200"
+		);
+
+		if ( empty( $ids ) ) {
 			return [];
 		}
-		return self::get_top_posts_for_month( $month, $lang, $limit );
-	}
 
-	private static function most_recent_month(): ?string {
-		global $wpdb;
-		$table = $wpdb->prefix . 'rpp_monthly_snapshots';
-		$month = $wpdb->get_var( "SELECT MAX(snapshot_month) FROM {$table} WHERE post_id != 0" );
-		return $month ?: null;
+		return get_posts( [
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'post__in'       => array_map( 'intval', $ids ),
+			'orderby'        => 'post__in',
+			'posts_per_page' => $limit,
+			'lang'           => $lang,
+		] );
 	}
 }
