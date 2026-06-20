@@ -24,9 +24,22 @@ class TVF_Homepage {
 		return TVF_Store::resolve_posts_for_slugs( $lang, $entry['slugs'], $limit );
 	}
 
-	/** Catalog entry (label/description/slugs/section) for a key, or null if unknown. */
-	public static function get_card_meta( string $key ): ?array {
-		return tvf_get_homepage_catalog_entry( $key );
+	/**
+	 * Catalog entry (label/description/slugs/section) for a key, or null
+	 * if unknown — label/description are resolved to plain strings in
+	 * the requested language (falling back to French if not yet
+	 * translated), unlike the raw tvf_get_homepage_catalog_entry().
+	 */
+	public static function get_card_meta( string $key, string $lang = 'fr' ): ?array {
+		$entry = tvf_get_homepage_catalog_entry( $key );
+		if ( ! $entry ) {
+			return null;
+		}
+
+		$entry['label']       = tvf_resolve_catalog_text( $entry['label'], $lang );
+		$entry['description'] = tvf_resolve_catalog_text( $entry['description'], $lang );
+
+		return $entry;
 	}
 
 	/**

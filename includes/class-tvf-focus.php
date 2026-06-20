@@ -12,7 +12,10 @@ defined( 'ABSPATH' ) || exit;
  */
 class TVF_Focus {
 
-	const FULL_FINDER_URL = 'https://www.mamanvoyage.com/ou-partir-trouvez-votre-prochain-voyage/';
+	/** Full-finder page per language — only French exists today; languages with no entry just don't get an escalation link. */
+	const FULL_FINDER_URLS = [
+		'fr' => 'https://www.mamanvoyage.com/ou-partir-trouvez-votre-prochain-voyage/',
+	];
 
 	public static function init(): void {
 		add_shortcode( 'travel_finder_focus', [ __CLASS__, 'render_shortcode' ] );
@@ -28,7 +31,8 @@ class TVF_Focus {
 
 		$slugs = self::current_slugs();
 		if ( empty( $slugs ) ) {
-			wp_safe_redirect( home_url( '/' ) );
+			$home = function_exists( 'pll_home_url' ) ? pll_home_url() : home_url( '/' );
+			wp_safe_redirect( $home );
 			exit;
 		}
 	}
@@ -53,20 +57,21 @@ class TVF_Focus {
 			return ''; // maybe_redirect() already handles this on a normal page load.
 		}
 
-		$lang  = function_exists( 'pll_current_language' ) ? ( pll_current_language( 'slug' ) ?: 'fr' ) : 'fr';
-		$posts = TVF_Store::resolve_posts_for_slugs( $lang, $slugs, 9 );
-		$more_url = add_query_arg( 'f', implode( ',', $slugs ), self::FULL_FINDER_URL );
+		$lang     = self::current_lang();
+		$posts    = TVF_Store::resolve_posts_for_slugs( $lang, $slugs, 9 );
+		$full_url = self::FULL_FINDER_URLS[ $lang ] ?? null;
+		$more_url = $full_url ? add_query_arg( 'f', implode( ',', $slugs ), $full_url ) : null;
 
 		ob_start();
 		?>
 		<section class="mv-section mv-travel-finder-focus">
 			<div class="mv-container">
 				<header class="mv-section__header">
-					<h2 class="mv-section__title"><?php echo esc_html( self::title_for_slugs( $slugs ) ); ?></h2>
+					<h2 class="mv-section__title"><?php echo esc_html( self::title_for_slugs( $slugs, $lang ) ); ?></h2>
 				</header>
 				<?php if ( empty( $posts ) ) : ?>
 					<p class="tvf-no-results">
-						<?php esc_html_e( 'Aucun voyage ne correspond à votre sélection pour le moment.', 'travel-finder' ); ?>
+						<?php echo esc_html( self::text( 'no_results', $lang ) ); ?>
 					</p>
 				<?php else : ?>
 					<div class="mv-grid mv-grid--3">
@@ -75,11 +80,13 @@ class TVF_Focus {
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
-				<p class="mv-travel-finder-focus__more">
-					<a class="mv-button mv-button--secondary" href="<?php echo esc_url( $more_url ); ?>">
-						<?php esc_html_e( 'Affiner votre recherche', 'travel-finder' ); ?>
-					</a>
-				</p>
+				<?php if ( $more_url ) : ?>
+					<p class="mv-travel-finder-focus__more">
+						<a class="mv-button mv-button--secondary" href="<?php echo esc_url( $more_url ); ?>">
+							<?php echo esc_html( self::text( 'refine', $lang ) ); ?>
+						</a>
+					</p>
+				<?php endif; ?>
 			</div>
 		</section>
 		<?php
@@ -100,8 +107,12 @@ class TVF_Focus {
 		return tvf_parse_filter_param( $f );
 	}
 
-	/** Human label for a slug combination — catalog label if it matches one, else joined filter labels. */
-	private static function title_for_slugs( array $slugs ): string {
+	private static function current_lang(): string {
+		return function_exists( 'pll_current_language' ) ? ( pll_current_language( 'slug' ) ?: 'fr' ) : 'fr';
+	}
+
+	/** Human label for a slug combination — catalog label if it matches one, else joined filter labels, else a generic fallback. All language-aware. */
+	private static function title_for_slugs( array $slugs, string $lang ): string {
 		$sorted_slugs = $slugs;
 		sort( $sorted_slugs );
 
@@ -110,15 +121,46 @@ class TVF_Focus {
 				$entry_slugs = $entry['slugs'];
 				sort( $entry_slugs );
 				if ( $entry_slugs === $sorted_slugs ) {
-					return $entry['label'];
+					return tvf_resolve_catalog_text( $entry['label'], $lang );
 				}
 			}
 		}
 
+		// tvf_get_slug_labels() is French-only today, so this joined-label
+		// path (for filter combos with no matching catalog entry) will
+		// still show French text on en/de pages until those are
+		// translated too — known gap, not hit by any curated tile today.
 		$labels = tvf_get_slug_labels();
 		$names  = array_filter( array_map( static fn( $s ) => $labels[ $s ] ?? null, $slugs ) );
 
-		return $names ? implode( ', ', $names ) : __( 'Nos idées de voyage', 'travel-finder' );
+		if ( $names ) {
+			return implode( ', ', $names );
+		}
+
+		return self::text( 'fallback_title', $lang );
+	}
+
+	/** Small set of UI strings not tied to catalog data. */
+	private static function text( string $key, string $lang ): string {
+		$strings = [
+			'no_results'    => [
+				'fr' => 'Aucun voyage ne correspond à votre sélection pour le moment.',
+				'en' => 'No trips match your selection just yet.',
+				'de' => 'Für deine Auswahl gibt es aktuell keine Treffer.',
+			],
+			'refine'        => [
+				'fr' => 'Affiner votre recherche',
+				'en' => 'Refine your search',
+				'de' => 'Suche verfeinern',
+			],
+			'fallback_title' => [
+				'fr' => 'Nos idées de voyage',
+				'en' => 'Our travel ideas',
+				'de' => 'Unsere Reiseideen',
+			],
+		];
+
+		return $strings[ $key ][ $lang ] ?? $strings[ $key ]['fr'];
 	}
 
 	private static function card_html( WP_Post $post ): string {
