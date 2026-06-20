@@ -177,7 +177,7 @@ function tvf_get_homepage_catalog(): array {
 			],
 			'sans_decalage' => [
 				'label'       => __( 'Sans décalage horaire', 'travel-finder' ),
-				'description' => __( 'Voyager loin sans subir le décalage horaire.', 'travel-finder' ),
+				'description' => __( 'Près de chez vous ou à l’autre bout du monde, sans décalage horaire à gérer.', 'travel-finder' ),
 				'slugs'       => [ 'sans_decalage' ],
 			],
 			'plus_loin'     => [
