@@ -174,6 +174,67 @@ class TVF_Store {
 		self::bust_cache( $lang );
 	}
 
+	/**
+	 * Copies every French post's filter weights to its English/German
+	 * Polylang translations, where a translation exists. English/German
+	 * posts are translations of the French originals, so the same
+	 * weights genuinely apply — this is a deliberate copy, not a
+	 * query-time join through Polylang's translation tables, since the
+	 * data barely changes and a copy keeps every existing query
+	 * (query_results(), resolve_posts_for_slugs(), etc.) working for
+	 * en/de with no code changes at all.
+	 *
+	 * Safe to re-run — upserts via save_weights(), so existing EN/DE rows
+	 * are simply overwritten with the current French values. That also
+	 * means any weights manually edited directly on an EN/DE post will
+	 * be overwritten the next time this runs.
+	 *
+	 * @return array{synced:int, fr_posts_checked:int, languages:array{en:int,de:int}}
+	 */
+	public static function sync_translations(): array {
+		$languages = [ 'en' => 0, 'de' => 0 ];
+
+		if ( ! function_exists( 'pll_get_post' ) ) {
+			return [ 'synced' => 0, 'fr_posts_checked' => 0, 'languages' => $languages ];
+		}
+
+		global $wpdb;
+		$table = self::table_name();
+
+		$fr_post_ids = $wpdb->get_col(
+			$wpdb->prepare( "SELECT DISTINCT post_id FROM {$table} WHERE lang = %s", 'fr' )
+		);
+
+		$synced = 0;
+
+		foreach ( $fr_post_ids as $fr_post_id ) {
+			$fr_post_id = (int) $fr_post_id;
+			$weights    = self::get_weights( $fr_post_id, 'fr' );
+
+			if ( empty( $weights ) ) {
+				continue;
+			}
+
+			foreach ( [ 'en', 'de' ] as $lang ) {
+				$translated_id = pll_get_post( $fr_post_id, $lang );
+
+				if ( ! $translated_id || ! get_post( $translated_id ) ) {
+					continue;
+				}
+
+				self::save_weights( (int) $translated_id, $lang, $weights );
+				++$synced;
+				++$languages[ $lang ];
+			}
+		}
+
+		return [
+			'synced'           => $synced,
+			'fr_posts_checked' => count( $fr_post_ids ),
+			'languages'        => $languages,
+		];
+	}
+
 	// -------------------------------------------------------------------------
 	// Dead-filter detection
 	// -------------------------------------------------------------------------

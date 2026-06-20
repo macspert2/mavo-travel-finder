@@ -14,6 +14,7 @@ class TVF_Admin {
 		add_action( 'wp_ajax_tvf_get_weights', [ __CLASS__, 'ajax_get_weights' ] );
 		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
 		add_action( 'admin_post_tvf_clear_cache', [ __CLASS__, 'handle_clear_cache' ] );
+		add_action( 'admin_post_tvf_sync_translations', [ __CLASS__, 'handle_sync_translations' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -54,6 +55,14 @@ class TVF_Admin {
 			'travel-finder-import',
 			[ __CLASS__, 'render_import_page' ]
 		);
+		add_submenu_page(
+			'travel-finder',
+			__( 'Synchroniser EN/DE', 'travel-finder' ),
+			__( 'Synchroniser EN/DE', 'travel-finder' ),
+			'manage_options',
+			'travel-finder-sync',
+			[ __CLASS__, 'render_sync_page' ]
+		);
 	}
 
 	public static function enqueue_assets( string $hook ): void {
@@ -61,6 +70,7 @@ class TVF_Admin {
 			'toplevel_page_travel-finder',
 			'travel-finder_page_travel-finder-coverage',
 			'travel-finder_page_travel-finder-import',
+			'travel-finder_page_travel-finder-sync',
 			'post.php',
 			'post-new.php',
 		];
@@ -330,6 +340,71 @@ class TVF_Admin {
 			</form>
 		</div>
 		<?php
+	}
+
+	// -------------------------------------------------------------------------
+	// Sync EN/DE translations page
+	// -------------------------------------------------------------------------
+
+	public static function render_sync_page(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Travel Finder — Synchroniser EN/DE', 'travel-finder' ); ?></h1>
+
+			<?php if ( isset( $_GET['tvf_synced'] ) ) : ?>
+				<div class="notice notice-success is-dismissible">
+					<p>
+						<?php
+						printf(
+							/* translators: 1: number of translations updated, 2: number of French posts with weights checked */
+							esc_html__( '%1$d traduction(s) mise(s) à jour, sur %2$d article(s) français avec des poids configurés.', 'travel-finder' ),
+							(int) $_GET['tvf_synced'],
+							(int) ( $_GET['tvf_checked'] ?? 0 )
+						);
+						?>
+					</p>
+				</div>
+			<?php endif; ?>
+
+			<p>
+				<?php esc_html_e( 'Copie les poids de chaque article français vers ses traductions anglaise et allemande, via les liens de traduction Polylang — seuls les articles ayant une traduction existante sont mis à jour.', 'travel-finder' ); ?>
+			</p>
+			<p>
+				<strong><?php esc_html_e( 'Attention :', 'travel-finder' ); ?></strong>
+				<?php esc_html_e( 'à chaque exécution, les poids EN/DE existants sont remplacés par les valeurs françaises actuelles. Toute modification manuelle des poids faite directement sur un article EN ou DE sera donc écrasée la prochaine fois que cette synchronisation est lancée.', 'travel-finder' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'tvf_sync_translations', 'tvf_sync_nonce' ); ?>
+				<input type="hidden" name="action" value="tvf_sync_translations">
+				<?php submit_button( __( 'Synchroniser maintenant', 'travel-finder' ) ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	public static function handle_sync_translations(): void {
+		check_admin_referer( 'tvf_sync_translations', 'tvf_sync_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+
+		$result = TVF_Store::sync_translations();
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'        => 'travel-finder-sync',
+					'tvf_synced'  => $result['synced'],
+					'tvf_checked' => $result['fr_posts_checked'],
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	// -------------------------------------------------------------------------
