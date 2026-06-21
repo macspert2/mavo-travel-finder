@@ -293,3 +293,19 @@
   color: #e07b54;
   text-decoration: underline;
 }
+
+/* Réglages page — catalog key checkboxes */
+
+.tvf-key-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: 24px;
+}
+
+.tvf-key-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 220px;
+}

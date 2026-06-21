@@ -15,6 +15,7 @@ class TVF_Admin {
 		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
 		add_action( 'admin_post_tvf_clear_cache', [ __CLASS__, 'handle_clear_cache' ] );
 		add_action( 'admin_post_tvf_sync_translations', [ __CLASS__, 'handle_sync_translations' ] );
+		add_action( 'admin_post_tvf_save_settings', [ __CLASS__, 'handle_save_settings' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -63,6 +64,14 @@ class TVF_Admin {
 			'travel-finder-sync',
 			[ __CLASS__, 'render_sync_page' ]
 		);
+		add_submenu_page(
+			'travel-finder',
+			__( 'Réglages', 'travel-finder' ),
+			__( 'Réglages', 'travel-finder' ),
+			'manage_options',
+			'travel-finder-settings',
+			[ __CLASS__, 'render_settings_page' ]
+		);
 	}
 
 	public static function enqueue_assets( string $hook ): void {
@@ -71,6 +80,7 @@ class TVF_Admin {
 			'travel-finder_page_travel-finder-coverage',
 			'travel-finder_page_travel-finder-import',
 			'travel-finder_page_travel-finder-sync',
+			'travel-finder_page_travel-finder-settings',
 			'post.php',
 			'post-new.php',
 		];
@@ -401,6 +411,98 @@ class TVF_Admin {
 					'tvf_synced'  => $result['synced'],
 					'tvf_checked' => $result['fr_posts_checked'],
 				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
+	// -------------------------------------------------------------------------
+	// Réglages page
+	// -------------------------------------------------------------------------
+
+	public static function render_settings_page(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+
+		$selected = array_flip( tvf_get_family_travel_theme_keys() );
+		$section_labels = [
+			'family_travel_themes' => __( 'Thèmes familiaux', 'travel-finder' ),
+			'seasonal_guides'      => __( 'Guides saisonniers', 'travel-finder' ),
+			'featured_destinations'=> __( 'Destinations phares', 'travel-finder' ),
+		];
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Travel Finder — Réglages', 'travel-finder' ); ?></h1>
+
+			<?php if ( isset( $_GET['tvf_settings_saved'] ) ) : ?>
+				<div class="notice notice-success is-dismissible">
+					<p><?php esc_html_e( 'Réglages enregistrés.', 'travel-finder' ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<?php $mv_url = menu_page_url( 'mv-settings', false ); ?>
+			<?php if ( $mv_url ) : ?>
+				<p>
+					<?php esc_html_e( 'Réglages liés au thème (sections affichées sur les pages d’accueil et la barre latérale de recherche) :', 'travel-finder' ); ?>
+					<a href="<?php echo esc_url( $mv_url ); ?>"><?php esc_html_e( 'voir cette page', 'travel-finder' ); ?></a>
+				</p>
+			<?php endif; ?>
+
+			<h2><?php esc_html_e( '« Voyager selon votre famille » — thèmes affichés', 'travel-finder' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Choisissez les entrées du catalogue affichées dans cette section, sur les 3 langues. Seules bébé / jeunes enfants / ados ont une traduction anglaise et allemande réelle aujourd’hui — toute autre entrée s’affichera en français sur les pages EN/DE tant qu’elle n’est pas traduite.', 'travel-finder' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'tvf_save_settings', 'tvf_settings_nonce' ); ?>
+				<input type="hidden" name="action" value="tvf_save_settings">
+
+				<?php foreach ( tvf_get_homepage_catalog() as $section => $entries ) : ?>
+					<h3><?php echo esc_html( $section_labels[ $section ] ?? $section ); ?></h3>
+					<div class="tvf-key-checkboxes">
+						<?php foreach ( $entries as $key => $entry ) : ?>
+							<label class="tvf-key-checkbox">
+								<input type="checkbox" name="family_travel_theme_keys[]" value="<?php echo esc_attr( $key ); ?>" <?php checked( isset( $selected[ $key ] ) ); ?>>
+								<?php echo esc_html( tvf_resolve_catalog_text( $entry['label'], 'fr' ) ); ?>
+							</label>
+						<?php endforeach; ?>
+					</div>
+				<?php endforeach; ?>
+
+				<?php submit_button( __( 'Enregistrer les réglages', 'travel-finder' ) ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	public static function handle_save_settings(): void {
+		check_admin_referer( 'tvf_save_settings', 'tvf_settings_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+
+		$valid_keys = [];
+		foreach ( tvf_get_homepage_catalog() as $entries ) {
+			$valid_keys = array_merge( $valid_keys, array_keys( $entries ) );
+		}
+		$valid_keys = array_flip( $valid_keys );
+
+		$submitted = is_array( $_POST['family_travel_theme_keys'] ?? null ) ? $_POST['family_travel_theme_keys'] : [];
+		$keys      = [];
+		foreach ( $submitted as $key ) {
+			$key = sanitize_key( (string) $key );
+			if ( isset( $valid_keys[ $key ] ) ) {
+				$keys[] = $key;
+			}
+		}
+
+		update_option( 'tvf_family_travel_theme_keys', $keys );
+
+		wp_safe_redirect(
+			add_query_arg(
+				[ 'page' => 'travel-finder-settings', 'tvf_settings_saved' => '1' ],
 				admin_url( 'admin.php' )
 			)
 		);

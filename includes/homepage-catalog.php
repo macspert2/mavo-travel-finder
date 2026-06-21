@@ -238,3 +238,18 @@ function tvf_get_homepage_catalog_entry( string $key ): ?array {
 function tvf_resolve_catalog_text( array $field, string $lang ): string {
 	return $field[ $lang ] ?? $field['fr'] ?? '';
 }
+
+/**
+ * Which catalog keys the homepage "family travel themes" section shows,
+ * across all 3 languages — configurable from the plugin's Réglages
+ * admin page rather than hardcoded in each of the 3 theme template
+ * parts (mv-home/, mv-home-en/, mv-home-de/ family-travel-themes.php).
+ * Only bebe/jeunes_enfants/ados have real EN/DE translations today —
+ * other catalog entries fall back to French text via
+ * tvf_resolve_catalog_text() if selected.
+ */
+function tvf_get_family_travel_theme_keys(): array {
+	$default = [ 'bebe', 'jeunes_enfants', 'ados' ];
+	$saved   = get_option( 'tvf_family_travel_theme_keys', $default );
+	return ( is_array( $saved ) && ! empty( $saved ) ) ? $saved : $default;
+}
