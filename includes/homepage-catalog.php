@@ -137,17 +137,17 @@ function tvf_get_homepage_catalog(): array {
 				'slugs'       => [ 'ados', 'roadtrip' ],
 			],
 			'budget_eco'        => [
-				'label'       => [ 'fr' => 'Petit budget' ],
+				'label'       => [ 'fr' => 'Budget serré' ],
 				'description' => [ 'fr' => 'Voyager en famille sans se ruiner.' ],
 				'slugs'       => [ 'economique' ],
 			],
 			'budget_medium'     => [
-				'label'       => [ 'fr' => 'Budget moyen' ],
+				'label'       => [ 'fr' => 'Bon rapport qualité-prix' ],
 				'description' => [ 'fr' => 'Un bon équilibre entre confort et prix.' ],
 				'slugs'       => [ 'medium' ],
 			],
 			'budget_premium'    => [
-				'label'       => [ 'fr' => 'Voyage haut de gamme' ],
+				'label'       => [ 'fr' => 'Se faire plaisir' ],
 				'description' => [ 'fr' => 'Pour les séjours plus confortables.' ],
 				'slugs'       => [ 'eleve' ],
 			],
@@ -208,7 +208,7 @@ function tvf_get_homepage_catalog(): array {
 				'slugs'       => [ 'europe' ],
 			],
 			'sans_decalage' => [
-				'label'       => [ 'fr' => 'Sans décalage horaire' ],
+				'label'       => [ 'fr' => 'Sans gros décalage horaire' ],
 				'description' => [ 'fr' => 'Près de chez vous ou dans l’hémisphère sud, sans décalage horaire à gérer.' ],
 				'slugs'       => [ 'sans_decalage' ],
 			],
