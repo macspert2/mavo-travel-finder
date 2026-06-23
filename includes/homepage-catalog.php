@@ -137,17 +137,17 @@ function tvf_get_homepage_catalog(): array {
 				'slugs'       => [ 'ados', 'roadtrip' ],
 			],
 			'budget_eco'        => [
-				'label'       => [ 'fr' => 'Budget serré' ],
+				'label'       => [ 'fr' => 'Économique' ],
 				'description' => [ 'fr' => 'Voyager en famille sans se ruiner.' ],
 				'slugs'       => [ 'economique' ],
 			],
 			'budget_medium'     => [
-				'label'       => [ 'fr' => 'Bon rapport qualité-prix' ],
+				'label'       => [ 'fr' => 'Moyen' ],
 				'description' => [ 'fr' => 'Un bon équilibre entre confort et prix.' ],
 				'slugs'       => [ 'medium' ],
 			],
 			'budget_premium'    => [
-				'label'       => [ 'fr' => 'Se faire plaisir' ],
+				'label'       => [ 'fr' => 'Élevé' ],
 				'description' => [ 'fr' => 'Pour les séjours plus confortables.' ],
 				'slugs'       => [ 'eleve' ],
 			],
