@@ -29,7 +29,7 @@ function tvf_get_homepage_catalog(): array {
 					'de' => 'Mit Baby',
 				],
 				'description' => [
-					'fr' => 'Nos voyages adaptés avec bébé.',
+					'fr' => 'Les destinations les plus adaptés avec bébé.',
 					'en' => 'Our tips for travelling with a baby.',
 					'de' => 'Unsere Tipps für Reisen mit einem Baby.',
 				],
@@ -37,12 +37,12 @@ function tvf_get_homepage_catalog(): array {
 			],
 			'jeunes_enfants'    => [
 				'label'       => [
-					'fr' => 'Avec de jeunes enfants',
-					'en' => 'With young children',
-					'de' => 'Mit kleinen Kindern',
+					'fr' => 'Avec  enfants',
+					'en' => 'With children',
+					'de' => 'Mit Kindern',
 				],
 				'description' => [
-					'fr' => 'Des idées de voyage adaptées aux petits.',
+					'fr' => 'Nos voyages pour petits et grands.',
 					'en' => 'Travel ideas suited to little ones.',
 					'de' => 'Reiseideen für die Kleinen.',
 				],
@@ -55,7 +55,7 @@ function tvf_get_homepage_catalog(): array {
 					'de' => 'Mit Teenagern',
 				],
 				'description' => [
-					'fr' => 'Des destinations qui plaisent aussi aux ados.',
+					'fr' => 'Destinations qui plaisent aussi aux ados.',
 					'en' => 'Destinations that teens enjoy too.',
 					'de' => 'Reiseziele, die auch Teenagern gefallen.',
 				],
