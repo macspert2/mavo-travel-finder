@@ -29,7 +29,7 @@ function tvf_get_homepage_catalog(): array {
 					'de' => 'Mit Baby',
 				],
 				'description' => [
-					'fr' => 'Nos conseils pour voyager avec un bébé.',
+					'fr' => 'Nos voyages adaptés avec bébé.',
 					'en' => 'Our tips for travelling with a baby.',
 					'de' => 'Unsere Tipps für Reisen mit einem Baby.',
 				],
