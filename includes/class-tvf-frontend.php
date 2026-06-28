@@ -302,15 +302,16 @@ class TVF_Frontend {
 			$url   = get_permalink( $post );
 			$title = get_the_title( $post );
 
-			echo '<article class="tvf-card">';
-			echo '<a href="' . esc_url( $url ) . '" class="tvf-card-link">';
+			// Pattern A overlay tile. tvf-card kept for JS compatibility.
+			$tile_classes = 'mv-tile mv-tile--overlay tvf-card' . ( $thumb ? '' : ' mv-tile--no-media' );
+			echo '<a class="' . esc_attr( $tile_classes ) . '" href="' . esc_url( $url ) . '">';
 			if ( $thumb ) {
-				echo '<div class="tvf-card-img" style="background-image:url(\'' . esc_url( $thumb ) . '\')" role="img" aria-label="' . esc_attr( $title ) . '"></div>';
-			} else {
-				echo '<div class="tvf-card-img tvf-card-img--no-thumb"></div>';
+				echo '<span class="mv-tile__media">';
+				echo '<img class="mv-tile__img" src="' . esc_url( $thumb ) . '" alt="" loading="lazy" decoding="async">';
+				echo '</span>';
 			}
-			echo '<div class="tvf-card-overlay"><h3 class="tvf-card-title">' . esc_html( $title ) . '</h3></div>';
-			echo '</a></article>';
+			echo '<span class="mv-tile__body"><span class="mv-tile__title">' . esc_html( $title ) . '</span></span>';
+			echo '</a>';
 		}
 
 		$articles_html = ob_get_clean();

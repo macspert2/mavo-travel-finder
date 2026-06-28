@@ -264,15 +264,15 @@
 }
 
 .tvf-chip.is-on {
-  background: var(--tvf-accent);
-  border-color: var(--tvf-accent);
+  background: var(--mv-color-primary, #4e74a5);
+  border-color: var(--mv-color-primary, #4e74a5);
   color: var(--tvf-white);
-  box-shadow: 0 3px 12px rgba(224, 123, 84, 0.35);
+  box-shadow: 0 3px 12px rgba(var(--mv-color-primary-rgb, 78, 116, 165), .28);
 }
 
 .tvf-chip.is-on:hover {
-  background: #d0673f;
-  border-color: #d0673f;
+  background: var(--mv-color-warm-dark, #5c3d2e);
+  border-color: var(--mv-color-warm-dark, #5c3d2e);
   color: var(--tvf-white);
 }
 
