@@ -331,7 +331,7 @@ class TVF_Frontend {
 
 			// Compact horizontal result tile: small thumbnail left, title right.
 			$tile_classes = 'mv-tile mv-tile--result mv-tile--compact' . ( $thumb ? '' : ' mv-tile--no-media' );
-			echo '<a class="' . esc_attr( $tile_classes ) . '" href="' . esc_url( $url ) . '">';
+			echo '<div class="' . esc_attr( $tile_classes ) . '">';
 			if ( $thumb ) {
 				echo '<span class="mv-tile__media">';
 				echo '<img class="mv-tile__img" src="' . esc_url( $thumb ) . '" alt="" loading="lazy" decoding="async">';
@@ -344,11 +344,12 @@ class TVF_Frontend {
 					'context'        => 'finder_result',
 					'limit'          => 2,
 					'active_filters' => $slugs,
+					'link_badges'    => true,
 				] );
 			}
-			echo '<span class="mv-tile__title">' . esc_html( $title ) . '</span>';
+			echo '<span class="mv-tile__title"><a class="mv-tile__link" href="' . esc_url( $url ) . '">' . esc_html( $title ) . '</a></span>';
 			echo '</span>';
-			echo '</a>';
+			echo '</div>';
 		}
 
 		$articles_html = ob_get_clean();
