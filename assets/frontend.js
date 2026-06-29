@@ -225,11 +225,11 @@
 		var countEl = document.getElementById( 'tvf-count' );
 		if ( ! countEl ) return;
 		if ( ! getSelected().length ) {
-			countEl.setAttribute( 'hidden', '' );
+			countEl.style.display = 'none';
 			return;
 		}
 		if ( total === undefined || total === null ) return;
-		countEl.removeAttribute( 'hidden' );
+		countEl.style.display = '';
 		countEl.textContent = formatCount( total, true );
 	}
 

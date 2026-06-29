@@ -393,9 +393,6 @@
   font-weight: 600;
 }
 
-.tvf-count[hidden] {
-  display: none;
-}
 
 @media (max-width: 640px) {
   .tvf-results-header {
