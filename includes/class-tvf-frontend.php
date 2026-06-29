@@ -167,7 +167,7 @@ class TVF_Frontend {
 
 			<div class="tvf-results-header">
 				<h2 class="tvf-results-title"><?php echo esc_html( $results_title ); ?></h2>
-				<p class="tvf-count" id="tvf-count" aria-live="polite" aria-atomic="true"><?php echo esc_html( self::format_count( $cards['total_count'] ?? 0, $selected, $lang ) ); ?></p>
+				<p class="tvf-count" id="tvf-count" aria-live="polite" aria-atomic="true"<?php echo empty( $selected ) ? ' hidden' : ''; ?>><?php echo ! empty( $selected ) ? esc_html( self::format_count( $cards['total_count'] ?? 0, $selected, $lang ) ) : ''; ?></p>
 			</div>
 
 			<div id="tvf-results" class="tvf-results">

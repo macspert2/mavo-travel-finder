@@ -223,8 +223,14 @@
 
 	function updateCount( total ) {
 		var countEl = document.getElementById( 'tvf-count' );
-		if ( ! countEl || total === undefined || total === null ) return;
-		countEl.textContent = formatCount( total, getSelected().length > 0 );
+		if ( ! countEl ) return;
+		if ( ! getSelected().length ) {
+			countEl.setAttribute( 'hidden', '' );
+			return;
+		}
+		if ( total === undefined || total === null ) return;
+		countEl.removeAttribute( 'hidden' );
+		countEl.textContent = formatCount( total, true );
 	}
 
 	// -------------------------------------------------------------------------
