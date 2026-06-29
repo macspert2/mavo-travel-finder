@@ -337,7 +337,17 @@ class TVF_Frontend {
 				echo '<img class="mv-tile__img" src="' . esc_url( $thumb ) . '" alt="" loading="lazy" decoding="async">';
 				echo '</span>';
 			}
-			echo '<span class="mv-tile__body"><span class="mv-tile__title">' . esc_html( $title ) . '</span></span>';
+			echo '<span class="mv-tile__body">';
+			if ( function_exists( 'mv_tile_badges' ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo mv_tile_badges( (int) $post->ID, [
+					'context'        => 'finder_result',
+					'limit'          => 2,
+					'active_filters' => $slugs,
+				] );
+			}
+			echo '<span class="mv-tile__title">' . esc_html( $title ) . '</span>';
+			echo '</span>';
 			echo '</a>';
 		}
 
