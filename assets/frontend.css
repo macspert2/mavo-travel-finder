@@ -306,68 +306,12 @@
 }
 
 /* ============================================================
-   Cards grid
+   Cards grid — 2-column compact horizontal tiles
    ============================================================ */
 .tvf-cards-grid {
   display: grid;
-  grid-template-columns: repeat( auto-fill, minmax( min(240px, 100%), 1fr ) );
-  gap: 24px;
-}
-
-/* ============================================================
-   Card
-   ============================================================ */
-.tvf-card {
-  border-radius: var(--tvf-radius-card);
-  overflow: hidden;
-  background: var(--tvf-white);
-  box-shadow: var(--tvf-shadow);
-  transition: box-shadow var(--tvf-transition), transform var(--tvf-transition);
-  will-change: transform;
-}
-
-.tvf-card:hover {
-  box-shadow: var(--tvf-shadow-hover);
-  transform: translateY(-4px);
-}
-
-.tvf-card-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  position: relative;
-}
-
-.tvf-card-img {
-  aspect-ratio: 3 / 2;
-  background-size: cover;
-  background-position: center;
-  display: block;
-}
-
-.tvf-card-img--no-thumb {
-  background: linear-gradient(135deg, var(--tvf-cream) 0%, var(--tvf-border) 100%);
-}
-
-.tvf-card-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0px 16px 16px;
-  background: RGBA(78,116,165,0.7);
-  border-radius: 0 0 var(--tvf-radius-card) var(--tvf-radius-card);
-}
-
-
-.tvf-card-overlay h3.tvf-card-title {
-  color: var(--tvf-white);
-  font-size: 16px;
-  font-weight: 200;
-  line-height: 1.35;
-  margin: 16px 0px 0px;
-  letter-spacing: -0.01em;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 /* ============================================================
@@ -463,43 +407,21 @@
 }
 
 /* ============================================================
-   Loading skeleton
+   Loading state
    ============================================================ */
-@keyframes tvf-shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position:  600px 0; }
+@keyframes tvf-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 0.25; }
 }
 
-.tvf-loading .tvf-card {
+.tvf-loading {
   pointer-events: none;
-}
-
-.tvf-loading .tvf-card-img {
-  background-image: none !important;
-  background: linear-gradient(
-    90deg,
-    var(--tvf-cream) 25%,
-    var(--tvf-border) 50%,
-    var(--tvf-cream) 75%
-  );
-  background-size: 600px 100%;
-  animation: tvf-shimmer 1.4s ease-in-out infinite;
-}
-
-.tvf-loading .tvf-card-overlay,
-.tvf-loading .tvf-card-title {
-  opacity: 0;
+  animation: tvf-pulse 1.2s ease-in-out infinite;
 }
 
 /* ============================================================
    Responsive
    ============================================================ */
-@media ( max-width: 900px ) {
-  .tvf-cards-grid {
-    grid-template-columns: repeat( 2, 1fr );
-  }
-}
-
 @media ( max-width: 640px ) {
   .tvf-wrap {
     padding: 0 16px 60px;
@@ -521,13 +443,13 @@
     font-size: 14px;
     padding: 0px 18px;
   }
-}
 
-@media ( max-width: 480px ) {
   .tvf-cards-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media ( max-width: 480px ) {
   .tvf-row-secondary {
     flex-direction: column;
     gap: 16px;
@@ -539,11 +461,10 @@
    ============================================================ */
 @media ( prefers-reduced-motion: reduce ) {
   .tvf-chip,
-  .tvf-card,
   .tvf-reset-btn {
     transition: none;
   }
-  .tvf-loading .tvf-card-img {
+  .tvf-loading {
     animation: none;
   }
 }

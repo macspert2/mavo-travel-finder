@@ -329,8 +329,8 @@ class TVF_Frontend {
 			$url   = get_permalink( $post );
 			$title = get_the_title( $post );
 
-			// Pattern A overlay tile. tvf-card kept for JS compatibility.
-			$tile_classes = 'mv-tile mv-tile--overlay tvf-card' . ( $thumb ? '' : ' mv-tile--no-media' );
+			// Compact horizontal result tile: small thumbnail left, title right.
+			$tile_classes = 'mv-tile mv-tile--result mv-tile--compact' . ( $thumb ? '' : ' mv-tile--no-media' );
 			echo '<a class="' . esc_attr( $tile_classes ) . '" href="' . esc_url( $url ) . '">';
 			if ( $thumb ) {
 				echo '<span class="mv-tile__media">';
