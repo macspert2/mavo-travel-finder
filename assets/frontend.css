@@ -371,6 +371,39 @@
 }
 
 /* ============================================================
+   Results header (section title + live count)
+   ============================================================ */
+.tvf-results-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tvf-results-title {
+  margin: 0;
+}
+
+.tvf-count {
+  flex-shrink: 0;
+  margin: 0;
+  color: var(--tvf-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .tvf-results-header {
+    display: block;
+  }
+
+  .tvf-count {
+    margin-top: .25rem;
+  }
+}
+
+/* ============================================================
    Load more
    ============================================================ */
 .tvf-load-more-wrap {

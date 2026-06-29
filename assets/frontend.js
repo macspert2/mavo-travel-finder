@@ -112,6 +112,7 @@
 				setLoadMore( data.has_more, BATCH );
 				controller = null;
 				updateResetBtn( slugs );
+				updateCount( data.total_count );
 				if ( Array.isArray( data.dead_slugs ) ) {
 					updateDeadChips( data.dead_slugs );
 				}
@@ -203,6 +204,27 @@
 
 	function escHtml( str ) {
 		return str.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
+	}
+
+	function formatCount( total, hasFilters ) {
+		if ( total === 0 ) {
+			return lang === 'en' ? 'No matching ideas.'
+			     : lang === 'de' ? 'Keine passenden Ideen.'
+			     : 'Aucune idée ne correspond à cette sélection.';
+		}
+		var noun = total === 1
+			? ( lang === 'en' ? 'idea found' : lang === 'de' ? 'Idee gefunden' : 'idée trouvée' )
+			: ( lang === 'en' ? 'ideas found' : lang === 'de' ? 'Ideen gefunden' : 'idées trouvées' );
+		var suffix = hasFilters
+			? ( lang === 'en' ? ' for your selection' : lang === 'de' ? ' für Ihre Auswahl' : ' pour votre sélection' )
+			: '';
+		return total + ' ' + noun + suffix;
+	}
+
+	function updateCount( total ) {
+		var countEl = document.getElementById( 'tvf-count' );
+		if ( ! countEl || total === undefined || total === null ) return;
+		countEl.textContent = formatCount( total, getSelected().length > 0 );
 	}
 
 	// -------------------------------------------------------------------------

@@ -165,7 +165,10 @@ class TVF_Frontend {
 
 			<?php $cards = self::render_cards( $selected, $lang, 0 ); ?>
 
-			<h2 class="tvf-results-title"><?php echo esc_html( $results_title ); ?></h2>
+			<div class="tvf-results-header">
+				<h2 class="tvf-results-title"><?php echo esc_html( $results_title ); ?></h2>
+				<p class="tvf-count" id="tvf-count" aria-live="polite" aria-atomic="true"><?php echo esc_html( self::format_count( $cards['total_count'] ?? 0, $selected, $lang ) ); ?></p>
+			</div>
 
 			<div id="tvf-results" class="tvf-results">
 				<?php echo $cards['html']; ?>
@@ -237,6 +240,23 @@ class TVF_Frontend {
 		);
 	}
 
+	private static function format_count( int $count, array $selected, string $lang ): string {
+		if ( 0 === $count ) {
+			return match ( $lang ) {
+				'en'    => 'No matching ideas.',
+				'de'    => 'Keine passenden Ideen.',
+				default => 'Aucune idée ne correspond à cette sélection.',
+			};
+		}
+		$noun = 1 === $count
+			? match ( $lang ) { 'en' => 'idea found', 'de' => 'Idee gefunden', default => 'idée trouvée' }
+			: match ( $lang ) { 'en' => 'ideas found', 'de' => 'Ideen gefunden', default => 'idées trouvées' };
+		$suffix = ! empty( $selected )
+			? match ( $lang ) { 'en' => ' for your selection', 'de' => ' für Ihre Auswahl', default => ' pour votre sélection' }
+			: '';
+		return $count . "\u{00A0}" . $noun . $suffix;
+	}
+
 	private static function render_summary( array $selected, array $registry ): string {
 		if ( empty( $selected ) ) {
 			return '<span class="tvf-summary-empty">'
@@ -254,19 +274,25 @@ class TVF_Frontend {
 
 	/**
 	 * Renders a page of card <article> elements, cached in a transient.
-	 * Returns ['html' => string, 'has_more' => bool].
+	 * Returns ['html' => string, 'has_more' => bool, 'total_count' => int] at offset=0,
+	 * or ['html' => string, 'has_more' => bool] for subsequent pages (load-more).
 	 * Queries BATCH+1 rows; if 43 come back, has_more=true and only 42 are rendered.
 	 *
 	 * @param string[] $slugs
 	 * @param string   $lang
 	 * @param int      $offset 0-based row offset (multiples of 42).
-	 * @return array{html: string, has_more: bool}
+	 * @return array{html: string, has_more: bool, total_count?: int}
 	 */
 	public static function render_cards( array $slugs, string $lang, int $offset = 0 ): array {
 		sort( $slugs ); // canonical order for consistent cache keys
 		$cache_key = 'tvf_r3_' . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
+			// Backfill total_count for cache entries predating the count feature.
+			if ( $offset === 0 && ! array_key_exists( 'total_count', $cached ) ) {
+				$cached['total_count'] = TVF_Store::count_results( $lang, $slugs );
+				set_transient( $cache_key, $cached, HOUR_IN_SECONDS );
+			}
 			return $cached;
 		}
 
@@ -285,8 +311,9 @@ class TVF_Frontend {
 					. '</p>'
 				: '';
 			$result = [
-				'html'     => $offset === 0 ? '<div class="tvf-cards-grid">' . $inner . '</div>' : '',
-				'has_more' => false,
+				'html'        => $offset === 0 ? '<div class="tvf-cards-grid">' . $inner . '</div>' : '',
+				'has_more'    => false,
+				'total_count' => 0,
 			];
 			set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 			return $result;
@@ -323,6 +350,9 @@ class TVF_Frontend {
 			: $articles_html;
 
 		$result = [ 'html' => $html, 'has_more' => $has_more ];
+		if ( $offset === 0 ) {
+			$result['total_count'] = TVF_Store::count_results( $lang, $slugs );
+		}
 		set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 		return $result;
 	}

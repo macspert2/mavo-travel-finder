@@ -318,6 +318,55 @@ class TVF_Store {
 		return $dead;
 	}
 
+	/**
+	 * Returns the total count of matching published posts for a filter set.
+	 * Mirrors the WHERE/HAVING logic of query_results() but runs COUNT(*)
+	 * instead of fetching rows, so it is always exact regardless of offset.
+	 *
+	 * @param string   $lang
+	 * @param string[] $filter_slugs
+	 * @return int
+	 */
+	public static function count_results( string $lang, array $filter_slugs ): int {
+		global $wpdb;
+		$table = self::table_name();
+
+		if ( empty( $filter_slugs ) ) {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(DISTINCT pf.post_id)
+					 FROM {$table} pf
+					 JOIN {$wpdb->posts} p ON p.ID = pf.post_id
+					    AND p.post_status = 'publish' AND p.post_type = 'post'
+					 WHERE pf.lang = %s",
+					$lang
+				)
+			);
+		}
+
+		$count        = count( $filter_slugs );
+		$placeholders = implode( ',', array_fill( 0, $count, '%s' ) );
+		$args         = array_merge( [ $lang ], $filter_slugs, [ $count ] );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM (
+				     SELECT pf.post_id
+				     FROM {$table} pf
+				     JOIN {$wpdb->posts} p ON p.ID = pf.post_id
+				        AND p.post_status = 'publish' AND p.post_type = 'post'
+				     WHERE pf.lang = %s
+				       AND pf.filter_slug IN ({$placeholders})
+				       AND pf.weight > 0
+				     GROUP BY pf.post_id
+				     HAVING COUNT(DISTINCT pf.filter_slug) = %d
+				 ) AS matched",
+				...$args
+			)
+		);
+	}
+
 	// -------------------------------------------------------------------------
 	// Coverage
 	// -------------------------------------------------------------------------
