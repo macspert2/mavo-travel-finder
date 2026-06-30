@@ -138,11 +138,11 @@ class TVF_Frontend {
 						<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
 						<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
 					</svg>
-					<span class="tvf-share-tooltip" id="tvf-share-tooltip" role="status" hidden>
-						<?php esc_html_e( 'URL copiée — partagez par e-mail, message ou réseau social !', 'travel-finder' ); ?>
-					</span>
 				</button>
 			</div>
+			<p class="mv-share-status" id="tvf-share-tooltip" aria-live="polite" hidden>
+				<?php esc_html_e( 'URL copiée — partagez par e-mail, message ou réseau social !', 'travel-finder' ); ?>
+			</p>
 
 			<div class="tvf-summary" id="tvf-summary">
 				<span id="tvf-summary-text" aria-live="polite">
@@ -344,7 +344,6 @@ class TVF_Frontend {
 					'context'        => 'finder_result',
 					'limit'          => 2,
 					'active_filters' => $slugs,
-					'link_badges'    => true,
 				] );
 			}
 			echo '<span class="mv-tile__title"><a class="mv-tile__link" href="' . esc_url( $url ) . '">' . esc_html( $title ) . '</a></span>';
