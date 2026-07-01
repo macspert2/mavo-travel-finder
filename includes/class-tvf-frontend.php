@@ -320,6 +320,7 @@ class TVF_Frontend {
 		}
 
 		ob_start();
+		$badge_seen = [];
 		foreach ( $rows as $row ) {
 			$post = get_post( (int) $row['post_id'] );
 			if ( ! $post ) {
@@ -338,13 +339,17 @@ class TVF_Frontend {
 				echo '</span>';
 			}
 			echo '<span class="mv-tile__body">';
-			if ( function_exists( 'mv_tile_badges' ) ) {
-				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-				echo mv_tile_badges( (int) $post->ID, [
+			if ( function_exists( 'mv_get_tile_badges' ) ) {
+				$badge_args = [
 					'context'        => 'finder_result',
 					'limit'          => 2,
 					'active_filters' => $slugs,
-				] );
+					'seen_labels'    => $badge_seen,
+				];
+				$badges = mv_get_tile_badges( (int) $post->ID, $badge_args );
+				mv_badges_update_seen( $badge_seen, $badges );
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo mv_render_tile_badges( $badges, $badge_args );
 			}
 			echo '<span class="mv-tile__title"><a class="mv-tile__link" href="' . esc_url( $url ) . '">' . esc_html( $title ) . '</a></span>';
 			echo '</span>';
