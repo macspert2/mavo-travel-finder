@@ -2,7 +2,7 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Returns the 6 categories × 29 filters registry.
+ * Returns the 6 categories × 32 filters registry.
  * Slugs here must match CSV column headers exactly.
  */
 function tvf_get_registry(): array {
@@ -17,10 +17,13 @@ function tvf_get_registry(): array {
 				'culture_histoire'  => __( '🏛️ Culture & histoire', 'travel-finder' ),
 				'velo'              => __( '🚴 Vélo', 'travel-finder' ),
 				'voile'             => __( '⛵ Voile', 'travel-finder' ),
+				'campervan'         => __( '🚐 Campervan', 'travel-finder' ),
+				'ski'               => __( '⛷️ Ski', 'travel-finder' ),
 				'activites_famille' => __( '🎡 Activités en famille', 'travel-finder' ),
 				'detente'           => __( '🧘 Détente', 'travel-finder' ),
 				'shopping'          => __( '🛍️ Shopping', 'travel-finder' ),
 				'roadtrip'          => __( '🚗 Road trip', 'travel-finder' ),
+				'citytrip'          => __( '🏙️ City trip', 'travel-finder' ),
 			],
 		],
 		'saison' => [
