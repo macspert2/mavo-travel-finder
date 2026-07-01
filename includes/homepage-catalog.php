@@ -101,6 +101,11 @@ function tvf_get_homepage_catalog(): array {
 				'description' => [ 'fr' => 'Voyager en van ou en road trip avec des enfants.' ],
 				'slugs'       => [ 'roadtrip' ],
 			],
+			'citytrip'          => [
+				'label'       => [ 'fr' => 'City trip' ],
+				'description' => [ 'fr' => 'Les villes qui valent un voyage.' ],
+				'slugs'       => [ 'citytrip' ],
+			],
 			'velo'              => [
 				'label'       => [ 'fr' => 'Vélo en famille' ],
 				'description' => [ 'fr' => 'Itinéraires à vélo adaptés aux enfants.' ],
@@ -110,6 +115,16 @@ function tvf_get_homepage_catalog(): array {
 				'label'       => [ 'fr' => 'Voile en famille' ],
 				'description' => [ 'fr' => 'Naviguer en famille.' ],
 				'slugs'       => [ 'voile' ],
+			],
+			'campervan'         => [
+				'label'       => [ 'fr' => 'Campervan' ],
+				'description' => [ 'fr' => 'La liberté du van en famille.' ],
+				'slugs'       => [ 'campervan' ],
+			],
+			'ski'               => [
+				'label'       => [ 'fr' => 'Ski & neige' ],
+				'description' => [ 'fr' => 'Stations de ski et séjours à la neige en famille.' ],
+				'slugs'       => [ 'ski' ],
 			],
 			'gastronomie'       => [
 				'label'       => [ 'fr' => 'Gastronomie' ],
