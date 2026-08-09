@@ -7,6 +7,14 @@ class TVF_Frontend {
 		add_shortcode( 'travel_finder',    [ __CLASS__, 'render_shortcode' ] );
 		add_action( 'rest_api_init',       [ __CLASS__, 'register_rest_routes' ] );
 		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_assets' ] );
+
+		// SEO for filtered finder URLs (?f=…): canonical → clean permalink, robots → noindex,follow.
+		// Canonical is filtered on both integration points; only one of them is ever live
+		// (Yoast unhooks core's rel_canonical when it is active), so no duplicate tag can appear.
+		add_filter( 'get_canonical_url', [ __CLASS__, 'filter_canonical_url' ], 10, 2 );
+		add_filter( 'wpseo_canonical',   [ __CLASS__, 'filter_seo_plugin_canonical' ] );
+		// Yoast filters wp_robots at PHP_INT_MAX - 10 and explicitly leaves the last slots free.
+		add_filter( 'wp_robots',         [ __CLASS__, 'filter_robots' ], PHP_INT_MAX );
 	}
 
 	// -------------------------------------------------------------------------
@@ -15,7 +23,7 @@ class TVF_Frontend {
 
 	public static function enqueue_assets(): void {
 		global $post;
-		if ( ! is_a( $post, 'WP_Post' ) || ! has_shortcode( $post->post_content, 'travel_finder' ) ) {
+		if ( ! self::is_travel_finder_post( $post ) ) {
 			return;
 		}
 
@@ -25,6 +33,71 @@ class TVF_Frontend {
 			'restUrl' => rest_url( 'tvf/v1/results' ),
 			'nonce'   => wp_create_nonce( 'wp_rest' ),
 		] );
+	}
+
+	// -------------------------------------------------------------------------
+	// SEO — filtered finder URLs (?f=…)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * WP core canonical (rel_canonical / wp_get_canonical_url).
+	 * Inactive while an SEO plugin that unhooks rel_canonical (e.g. Yoast) is running.
+	 */
+	public static function filter_canonical_url( $canonical, $post ) {
+		return self::is_filtered_finder_view( $post ) ? get_permalink( $post ) : $canonical;
+	}
+
+	/**
+	 * Yoast SEO canonical ('wpseo_canonical'). Yoast intentionally outputs no canonical
+	 * on noindex pages — an empty value is left untouched so that policy still wins.
+	 */
+	public static function filter_seo_plugin_canonical( $canonical ) {
+		if ( '' === $canonical || ! is_string( $canonical ) ) {
+			return $canonical;
+		}
+
+		$post = get_queried_object();
+
+		return self::is_filtered_finder_view( $post ) ? get_permalink( $post ) : $canonical;
+	}
+
+	/**
+	 * Robots directives, via core's wp_robots array (which Yoast also feeds, earlier).
+	 * Only the directives that conflict with noindex,follow are dropped; max-image-preview
+	 * and friends are left in place.
+	 */
+	public static function filter_robots( array $robots ): array {
+		if ( ! self::is_filtered_finder_view( get_queried_object() ) ) {
+			return $robots;
+		}
+
+		unset( $robots['index'], $robots['nofollow'] );
+
+		return array_merge( [ 'noindex' => true, 'follow' => true ], $robots );
+	}
+
+	private static function is_travel_finder_post( $post ): bool {
+		return is_a( $post, 'WP_Post' )
+			&& has_shortcode( $post->post_content, 'travel_finder' );
+	}
+
+	/** The currently requested page is a Travel Finder page showing an actual filter selection. */
+	private static function is_filtered_finder_view( $post ): bool {
+		return self::is_travel_finder_post( $post )
+			&& get_queried_object_id() === (int) $post->ID
+			&& self::has_filter_request();
+	}
+
+	/** Filters requested through ?f=, parsed exactly like the finder itself parses them. */
+	private static function requested_filters(): array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public read-only view state.
+		$f = isset( $_GET['f'] ) ? sanitize_text_field( wp_unslash( $_GET['f'] ) ) : '';
+
+		return self::parse_filter_param( $f );
+	}
+
+	private static function has_filter_request(): bool {
+		return ! empty( self::requested_filters() );
 	}
 
 	// -------------------------------------------------------------------------
@@ -103,8 +176,7 @@ class TVF_Frontend {
 		);
 
 		$lang     = self::current_lang();
-		$f_param  = isset( $_GET['f'] ) ? sanitize_text_field( wp_unslash( $_GET['f'] ) ) : '';
-		$selected = self::parse_filter_param( $f_param );
+		$selected = self::requested_filters();
 		$registry = tvf_get_registry();
 		$base_url = self::base_url();
 
@@ -118,11 +190,6 @@ class TVF_Frontend {
 
 		ob_start();
 		?>
-		<?php if ( $selected ) : ?>
-			<link rel="canonical" href="<?php echo esc_url( $base_url ); ?>">
-			<meta name="robots" content="noindex,follow">
-		<?php endif; ?>
-
 		<div class="tvf-wrap" id="tvf-wrap" data-lang="<?php echo esc_attr( $lang ); ?>">
 
 			<div class="tvf-intro-row">
@@ -228,8 +295,9 @@ class TVF_Frontend {
 			? $base_url
 			: add_query_arg( 'f', implode( ',', $new_selected ), $base_url );
 
+		// rel="nofollow": filter permutations are crawl traps, and these URLs are noindex anyway.
 		return sprintf(
-			'<a href="%s" class="tvf-chip%s%s" role="checkbox" aria-checked="%s"%s data-slug="%s">%s</a>',
+			'<a href="%s" rel="nofollow" class="tvf-chip%s%s" role="checkbox" aria-checked="%s"%s data-slug="%s">%s</a>',
 			esc_url( $url ),
 			$is_on   ? ' is-on'   : '',
 			$is_dead ? ' is-dead' : '',
