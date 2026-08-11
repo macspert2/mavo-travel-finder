@@ -6,7 +6,6 @@
 	if ( ! wrap ) return;
 
 	const restUrl      = tvfFrontend.restUrl;
-	const restNonce    = tvfFrontend.nonce;
 	const lang         = wrap.dataset.lang || 'fr';
 	const results      = document.getElementById( 'tvf-results' );
 	const summary      = document.getElementById( 'tvf-summary' );
@@ -101,10 +100,7 @@
 		results.classList.add( 'tvf-loading' );
 		setLoadMore( false, BATCH );
 
-		fetch( restFetchUrl( slugs, 0 ), {
-			signal:  controller.signal,
-			headers: { 'X-WP-Nonce': restNonce },
-		} )
+		fetch( restFetchUrl( slugs, 0 ), { signal: controller.signal } )
 			.then( r => r.json() )
 			.then( function ( data ) {
 				results.innerHTML = data.html || '';
@@ -135,9 +131,7 @@
 		loadMoreBtn.disabled    = true;
 		loadMoreBtn.textContent = '…';
 
-		fetch( restFetchUrl( slugs, offset ), {
-			headers: { 'X-WP-Nonce': restNonce },
-		} )
+		fetch( restFetchUrl( slugs, offset ) )
 			.then( r => r.json() )
 			.then( function ( data ) {
 				if ( data.html ) {

@@ -29,9 +29,10 @@ class TVF_Frontend {
 
 		wp_enqueue_style( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.css', [], TVF_VERSION );
 		wp_enqueue_script( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.js', [], TVF_VERSION, true );
+		// No REST nonce: /tvf/v1/results is public read-only (permission_callback __return_true),
+		// and a cached nonce goes stale for visitors served from a page cache, breaking the finder.
 		wp_localize_script( 'tvf-frontend', 'tvfFrontend', [
 			'restUrl' => rest_url( 'tvf/v1/results' ),
-			'nonce'   => wp_create_nonce( 'wp_rest' ),
 		] );
 	}
 
