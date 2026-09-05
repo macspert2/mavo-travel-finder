@@ -223,8 +223,8 @@ function tvf_get_homepage_catalog(): array {
 				'slugs'       => [ 'europe' ],
 			],
 			'sans_decalage' => [
-				'label'       => [ 'fr' => 'Sans gros décalage horaire' ],
-				'description' => [ 'fr' => 'Près de chez vous ou dans l’hémisphère sud, sans décalage horaire à gérer.' ],
+				'label'       => [ 'fr' => 'Peu de décalage horaire' ],
+				'description' => [ 'fr' => 'Une heure de décalage au plus — l’Angleterre, le Portugal et le reste de l’Europe proche, sans nuits blanches à rattraper.' ],
 				'slugs'       => [ 'sans_decalage' ],
 			],
 			'plus_loin'     => [

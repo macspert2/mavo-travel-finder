@@ -223,6 +223,7 @@
     box-shadow var(--tvf-transition);
   white-space: nowrap;
   min-height: 36px;
+  box-sizing: border-box;
   user-select: none;
   -webkit-user-select: none;
   line-height: 1;
@@ -257,6 +258,112 @@
   background: var(--mv-color-warm-dark, #5c3d2e);
   border-color: var(--mv-color-warm-dark, #5c3d2e);
   color: var(--tvf-white);
+}
+
+/* ============================================================
+   Single-choice groups (Saison, Durée)
+   One pick at a time — drawn as a segmented control sitting in a
+   track, the everyday "pick one" shape, so the exclusive behaviour
+   reads before anything is clicked. Multi-choice categories keep
+   their separate, free-standing chips.
+   ============================================================ */
+.tvf-group-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--tvf-muted);
+  opacity: 0.9;
+}
+
+.tvf-group-hint::before {
+  content: '· ';
+}
+
+.tvf-group--single .tvf-group-chips {
+  gap: 2px;
+  padding: 3px;
+  box-sizing: border-box;
+  background: var(--tvf-cream);
+  border: 1.5px solid var(--tvf-border);
+  border-radius: var(--tvf-radius-chip);
+}
+
+.tvf-chip--single {
+  background: transparent;
+  border-color: transparent;
+  min-height: 32px;
+  padding: 0 14px;
+}
+
+.tvf-chip--single:hover {
+  background: var(--tvf-white);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ============================================================
+   Saison — hero row above everything else
+   Centred and warm-accented, so the first choice on the page is
+   visibly a different kind of choice from the chips below it.
+   ============================================================ */
+.tvf-row-saison {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--tvf-cream);
+}
+
+.tvf-row-saison .tvf-filter-group {
+  align-items: center;
+  gap: 10px;
+}
+
+.tvf-row-saison .tvf-group-label {
+  font-size: 11px;
+  color: var(--tvf-accent);
+}
+
+.tvf-row-saison .tvf-group-chips {
+  justify-content: center;
+  background: var(--tvf-accent-light);
+  border-color: var(--tvf-accent-light);
+}
+
+.tvf-row-saison .tvf-chip {
+  min-height: 38px;
+  font-size: 14px;
+  padding: 0 20px;
+}
+
+.tvf-row-saison .tvf-chip.is-on {
+  background: var(--tvf-accent);
+  border-color: var(--tvf-accent);
+  color: var(--tvf-white);
+  box-shadow: 0 3px 12px rgba(224, 123, 84, 0.32);
+}
+
+.tvf-row-saison .tvf-chip.is-on:hover {
+  background: #c9663f;
+  border-color: #c9663f;
+}
+
+/* Narrow screens: single-choice tracks span the full width and their chips
+   share the rows evenly, so a wrapped track still reads as one control
+   instead of a giant pill with a stray item hanging off the bottom. */
+@media ( max-width: 640px ) {
+  .tvf-group--single .tvf-group-chips {
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .tvf-group--single .tvf-chip {
+    flex: 1 1 40%;
+    justify-content: center;
+    padding: 0 12px;
+  }
 }
 
 .tvf-reset-btn[hidden] { display: none; }

@@ -260,6 +260,14 @@ class TVF_Frontend {
 	private static function render_filters( array $selected, array $registry, string $base_url, array $dead_slugs = [] ): string {
 		ob_start();
 
+		// Row 0 — Saison, on its own centred row above everything else: it is the
+		// one filter almost every visitor has already made up their mind about.
+		if ( isset( $registry['saison'] ) ) {
+			echo '<div class="tvf-filter-row tvf-row-saison">';
+			echo self::group_html( 'saison', $registry['saison'], $selected, $base_url, $dead_slugs );
+			echo '</div>';
+		}
+
 		// Row 1 — Intérêt
 		echo '<div class="tvf-filter-row tvf-row-interet">';
 		foreach ( $registry['interet']['filters'] as $slug => $label ) {
@@ -267,44 +275,73 @@ class TVF_Frontend {
 		}
 		echo '</div>';
 
-		// Row 2 — all other categories, each as a labelled group
+		// Row 2 — remaining categories, each as a labelled group
 		echo '<div class="tvf-filter-row tvf-row-secondary">';
 		foreach ( $registry as $cat_slug => $cat ) {
-			if ( 'interet' === $cat_slug ) {
+			if ( 'interet' === $cat_slug || 'saison' === $cat_slug ) {
 				continue;
 			}
-			echo '<div class="tvf-filter-group">';
-			echo '<span class="tvf-group-label">' . esc_html( $cat['label'] ) . '</span>';
-			echo '<div class="tvf-group-chips">';
-			foreach ( $cat['filters'] as $slug => $label ) {
-				echo self::chip_html( $slug, $label, $selected, $base_url, $dead_slugs );
-			}
-			echo '</div></div>';
+			echo self::group_html( $cat_slug, $cat, $selected, $base_url, $dead_slugs );
 		}
 		echo '</div>';
 
 		return ob_get_clean();
 	}
 
-	private static function chip_html( string $slug, string $label, array $selected, string $base_url, array $dead_slugs = [] ): string {
+	/**
+	 * One labelled filter group. Single-choice categories are marked up as a
+	 * radiogroup (and carry their "one at a time" hint) so the exclusive
+	 * behaviour is announced, not just implied by the styling.
+	 */
+	private static function group_html( string $cat_slug, array $cat, array $selected, string $base_url, array $dead_slugs ): string {
+		$is_single = ! empty( $cat['single'] );
+		$label_id  = 'tvf-group-' . $cat_slug;
+
+		$html  = '<div class="tvf-filter-group tvf-group--' . esc_attr( $cat_slug )
+			. ( $is_single ? ' tvf-group--single' : '' ) . '">';
+		$html .= '<span class="tvf-group-label" id="' . esc_attr( $label_id ) . '">'
+			. esc_html( $cat['label'] );
+		if ( $is_single && ! empty( $cat['hint'] ) ) {
+			$html .= ' <span class="tvf-group-hint">' . esc_html( $cat['hint'] ) . '</span>';
+		}
+		$html .= '</span>';
+		$html .= '<div class="tvf-group-chips" role="' . ( $is_single ? 'radiogroup' : 'group' )
+			. '" aria-labelledby="' . esc_attr( $label_id ) . '">';
+		foreach ( $cat['filters'] as $slug => $label ) {
+			$html .= self::chip_html( $slug, $label, $selected, $base_url, $dead_slugs, $is_single ? $cat_slug : '' );
+		}
+		$html .= '</div></div>';
+
+		return $html;
+	}
+
+	/**
+	 * @param string $single_group Category slug when the chip belongs to a single-choice
+	 *                             category, '' otherwise. Mirrored to data-single-group so
+	 *                             frontend.js can apply the same swap rule without a second
+	 *                             copy of the registry.
+	 */
+	private static function chip_html( string $slug, string $label, array $selected, string $base_url, array $dead_slugs = [], string $single_group = '' ): string {
+		$is_single    = '' !== $single_group;
 		$is_on        = in_array( $slug, $selected, true );
 		$is_dead      = ! $is_on && in_array( $slug, $dead_slugs, true );
-		$new_selected = $is_on
-			? array_values( array_diff( $selected, [ $slug ] ) )
-			: array_merge( $selected, [ $slug ] );
+		$new_selected = tvf_toggle_selection( $slug, $selected );
 		$url          = empty( $new_selected )
 			? $base_url
 			: add_query_arg( 'f', implode( ',', $new_selected ), $base_url );
 
 		// rel="nofollow": filter permutations are crawl traps, and these URLs are noindex anyway.
 		return sprintf(
-			'<a href="%s" rel="nofollow" class="tvf-chip%s%s" role="checkbox" aria-checked="%s"%s data-slug="%s">%s</a>',
+			'<a href="%s" rel="nofollow" class="tvf-chip%s%s%s" role="%s" aria-checked="%s"%s data-slug="%s"%s>%s</a>',
 			esc_url( $url ),
+			$is_single ? ' tvf-chip--single' : '',
 			$is_on   ? ' is-on'   : '',
 			$is_dead ? ' is-dead' : '',
+			$is_single ? 'radio' : 'checkbox',
 			$is_on   ? 'true'     : 'false',
 			$is_dead ? ' aria-disabled="true" tabindex="-1"' : '',
 			esc_attr( $slug ),
+			$is_single ? ' data-single-group="' . esc_attr( $single_group ) . '"' : '',
 			esc_html( $label )
 		);
 	}
@@ -354,7 +391,7 @@ class TVF_Frontend {
 	 */
 	public static function render_cards( array $slugs, string $lang, int $offset = 0 ): array {
 		sort( $slugs ); // canonical order for consistent cache keys
-		$cache_key = 'tvf_r6_' . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
+		$cache_key = TVF_Store::RESULT_CACHE_PREFIX . $lang . '_' . md5( implode( ',', $slugs ) ) . '_' . $offset;
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			// Backfill total_count for cache entries predating the count feature.

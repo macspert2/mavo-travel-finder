@@ -3,6 +3,13 @@ defined( 'ABSPATH' ) || exit;
 
 class TVF_Store {
 
+	/**
+	 * Transient prefix for rendered result pages. Bumped whenever the ranking or
+	 * the rendered markup changes, which retires every stale entry at once; the
+	 * old ones lapse on their own one-hour TTL.
+	 */
+	const RESULT_CACHE_PREFIX = 'tvf_r7_';
+
 	public static function table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'tvf_post_filter';
@@ -49,6 +56,40 @@ class TVF_Store {
 	}
 
 	/**
+	 * The SUM() expression that scores a post, plus the placeholder values it needs.
+	 *
+	 * Filters from a category carrying a 'score_multiplier' count for more than
+	 * their stored weight — Saison is ×2, so a post tagged "automne 2" contributes
+	 * 4 to an autumn search and outranks posts that merely tolerate the season.
+	 * Only the selected slugs reach the SUM, so an unselected category never
+	 * enters the expression at all.
+	 *
+	 * @param string[] $filter_slugs Non-empty selection.
+	 * @return array{0: string,1: array} [ SQL expression, prepare() args ]
+	 */
+	private static function score_expression( array $filter_slugs ): array {
+		$boosts = array_intersect_key(
+			tvf_get_slug_score_multipliers(),
+			array_flip( $filter_slugs )
+		);
+
+		if ( empty( $boosts ) ) {
+			return [ 'SUM( pf.weight )', [] ];
+		}
+
+		$cases = '';
+		$args  = [];
+		foreach ( array_unique( $boosts ) as $multiplier ) {
+			$slugs = array_keys( $boosts, $multiplier, true );
+			$ph    = implode( ',', array_fill( 0, count( $slugs ), '%s' ) );
+			$cases .= " WHEN pf.filter_slug IN ({$ph}) THEN %d";
+			$args   = array_merge( $args, $slugs, [ (int) $multiplier ] );
+		}
+
+		return [ "SUM( pf.weight * CASE{$cases} ELSE 1 END )", $args ];
+	}
+
+	/**
 	 * Runs the scoring query. Fetches BATCH+1 rows so callers can detect whether
 	 * more results exist beyond the current page.
 	 *
@@ -86,13 +127,14 @@ class TVF_Store {
 
 		$count        = count( $filter_slugs );
 		$placeholders = implode( ',', array_fill( 0, $count, '%s' ) );
-		// $lang + N slugs + $count + $offset
-		$args = array_merge( [ $lang ], $filter_slugs, [ $count, $offset ] );
+		[ $score_expr, $score_args ] = self::score_expression( $filter_slugs );
+		// score CASE args + $lang + N slugs + $count + $offset
+		$args = array_merge( $score_args, [ $lang ], $filter_slugs, [ $count, $offset ] );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT pf.post_id, SUM( pf.weight ) AS score,
+				"SELECT pf.post_id, {$score_expr} AS score,
 				    CAST( COALESCE( pm.meta_value, 0 ) AS UNSIGNED ) AS views
 				 FROM {$table} pf
 				 JOIN {$wpdb->posts} p
@@ -240,14 +282,53 @@ class TVF_Store {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Returns slugs of unselected filters that would produce 0 results if added
-	 * to the current selection. Used to grey out incompatible chips.
+	 * Returns slugs of unselected filters that clicking would leave with 0 results.
+	 * Used to grey out incompatible chips.
+	 *
+	 * Chips of a single-choice category (saison, durée) replace the current pick of
+	 * that same category rather than adding to it, so they are judged against the
+	 * selection they would actually produce — without it, picking "été" would grey
+	 * out every other season, which are precisely the chips still worth clicking.
 	 *
 	 * @param string   $lang
 	 * @param string[] $selected_slugs Currently active filters.
 	 * @return string[] Dead (would-be-empty) filter slugs.
 	 */
 	public static function compute_dead_slugs( string $lang, array $selected_slugs ): array {
+		$dead   = self::dead_slugs_for_context( $lang, $selected_slugs );
+		$single = tvf_get_single_choice_map();
+
+		// One extra pass per single-choice category that already has a pick: its
+		// other chips are evaluated against the selection minus that pick.
+		$picked_groups = [];
+		foreach ( $selected_slugs as $slug ) {
+			if ( isset( $single[ $slug ] ) ) {
+				$picked_groups[ $single[ $slug ] ] = $slug;
+			}
+		}
+
+		foreach ( $picked_groups as $group => $picked ) {
+			$siblings = array_keys( array_filter( $single, static fn( $g ) => $g === $group ) );
+			$reduced  = array_values( array_diff( $selected_slugs, [ $picked ] ) );
+			$swapped  = self::dead_slugs_for_context( $lang, $reduced );
+
+			// Drop this group's slugs from the base verdict, then re-add the ones
+			// the swapped-selection pass still finds empty.
+			$dead = array_values( array_diff( $dead, $siblings ) );
+			$dead = array_merge( $dead, array_intersect( $siblings, $swapped ) );
+		}
+
+		return array_values( array_unique( $dead ) );
+	}
+
+	/**
+	 * The raw "adding this slug yields nothing" verdict for one exact selection.
+	 * Cached per selection; compute_dead_slugs() calls it once per context.
+	 *
+	 * @param string[] $selected_slugs
+	 * @return string[]
+	 */
+	private static function dead_slugs_for_context( string $lang, array $selected_slugs ): array {
 		sort( $selected_slugs ); // canonical order for cache key
 		$cache_key = 'tvf_dead_' . $lang . '_' . md5( implode( ',', $selected_slugs ) );
 		$cached    = get_transient( $cache_key );
@@ -401,7 +482,7 @@ class TVF_Store {
 	public static function bust_cache( string $lang ): void {
 		global $wpdb;
 
-		foreach ( [ 'tvf_r3_', 'tvf_dead_' ] as $prefix_base ) {
+		foreach ( [ self::RESULT_CACHE_PREFIX, 'tvf_dead_' ] as $prefix_base ) {
 			foreach ( [ '_transient_', '_transient_timeout_' ] as $type ) {
 				$wpdb->query(
 					$wpdb->prepare(

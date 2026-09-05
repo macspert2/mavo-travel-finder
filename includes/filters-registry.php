@@ -29,6 +29,13 @@ function tvf_get_registry(): array {
 		'saison' => [
 			'label'   => __( 'Saison', 'travel-finder' ),
 			'order'   => 2,
+			// Single-choice: results are ANDed, so two seasons at once can only ever
+			// return zero posts. Picking a season swaps the previous one out.
+			'single'  => true,
+			'hint'    => __( 'une seule saison à la fois', 'travel-finder' ),
+			// The season a family travels in outranks every other criterion, so its
+			// weight counts double when posts are scored (see TVF_Store::query_results).
+			'score_multiplier' => 2,
 			'filters' => [
 				'hiver'     => __( '❄️ Hiver', 'travel-finder' ),
 				'printemps' => __( '🌸 Printemps', 'travel-finder' ),
@@ -39,6 +46,8 @@ function tvf_get_registry(): array {
 		'duree' => [
 			'label'   => __( 'Durée', 'travel-finder' ),
 			'order'   => 3,
+			'single'  => true,
+			'hint'    => __( 'une seule durée à la fois', 'travel-finder' ),
 			'filters' => [
 				'2_3_jours' => __( '2–4 jours', 'travel-finder' ),
 				'semaine'   => __( '1 semaine', 'travel-finder' ),
@@ -71,7 +80,7 @@ function tvf_get_registry(): array {
 				'angleterre'    => __( '🇬🇧 Angleterre', 'travel-finder' ),
 				'mediterranee'  => __( '🏝️ Méditerranée', 'travel-finder' ),
 				'europe'        => __( '🗺️ Europe', 'travel-finder' ),
-				'sans_decalage' => __( '🌐 Sans décalage horaire', 'travel-finder' ),
+				'sans_decalage' => __( '🌐 Peu de décalage horaire', 'travel-finder' ),
 				'plus_loin'     => __( '✈️ Plus loin', 'travel-finder' ),
 			],
 		],
@@ -109,6 +118,107 @@ function tvf_get_slug_labels(): array {
 }
 
 /**
+ * Returns [ slug => multiplier ] for filters whose category carries a
+ * 'score_multiplier'. Filters of every other category are absent — the
+ * scoring query treats a missing entry as a multiplier of 1.
+ */
+function tvf_get_slug_score_multipliers(): array {
+	static $cache = null;
+	if ( $cache !== null ) {
+		return $cache;
+	}
+	$cache = [];
+	foreach ( tvf_get_registry() as $cat ) {
+		$mult = (int) ( $cat['score_multiplier'] ?? 1 );
+		if ( $mult === 1 ) {
+			continue;
+		}
+		foreach ( array_keys( $cat['filters'] ) as $slug ) {
+			$cache[ $slug ] = $mult;
+		}
+	}
+	return $cache;
+}
+
+/**
+ * Returns [ slug => category_slug ] for every filter that lives in a
+ * single-choice category (one selection at a time — see 'single' in the
+ * registry). Filters of every other category are absent from this map.
+ */
+function tvf_get_single_choice_map(): array {
+	static $cache = null;
+	if ( $cache !== null ) {
+		return $cache;
+	}
+	$cache = [];
+	foreach ( tvf_get_registry() as $cat_slug => $cat ) {
+		if ( empty( $cat['single'] ) ) {
+			continue;
+		}
+		foreach ( array_keys( $cat['filters'] ) as $slug ) {
+			$cache[ $slug ] = $cat_slug;
+		}
+	}
+	return $cache;
+}
+
+/**
+ * Enforces the single-choice rule: at most one selected filter per
+ * single-choice category, the last one listed winning. Results are ANDed,
+ * so two seasons (or two durations) at once could only ever match zero
+ * posts — an old bookmark or cookie holding such a pair is repaired here
+ * rather than showing an empty page.
+ *
+ * @param string[] $slugs
+ * @return string[]
+ */
+function tvf_normalize_selection( array $slugs ): array {
+	$single = tvf_get_single_choice_map();
+	$keep   = [];
+	$out    = [];
+
+	// Walk backwards so the last occurrence of a single-choice category wins.
+	foreach ( array_reverse( $slugs ) as $slug ) {
+		$cat = $single[ $slug ] ?? null;
+		if ( null !== $cat ) {
+			if ( isset( $keep[ $cat ] ) ) {
+				continue;
+			}
+			$keep[ $cat ] = true;
+		}
+		$out[] = $slug;
+	}
+
+	return array_reverse( $out );
+}
+
+/**
+ * The selection that results from clicking $slug while $selected is active:
+ * toggles it off if already on, otherwise adds it — replacing the current
+ * pick of the same category when that category is single-choice.
+ *
+ * @param string[] $selected
+ * @return string[]
+ */
+function tvf_toggle_selection( string $slug, array $selected ): array {
+	if ( in_array( $slug, $selected, true ) ) {
+		return array_values( array_diff( $selected, [ $slug ] ) );
+	}
+
+	$single = tvf_get_single_choice_map();
+	$cat    = $single[ $slug ] ?? null;
+
+	if ( null !== $cat ) {
+		$selected = array_values( array_filter(
+			$selected,
+			static fn( $s ) => ( $single[ $s ] ?? null ) !== $cat
+		) );
+	}
+
+	return array_merge( $selected, [ $slug ] );
+}
+
+/**
  * Parses a comma-separated `f` query value into validated filter_slugs.
  * Unknown slugs are dropped silently. Shared by TVF_Frontend and TVF_Focus
  * so both validate `f` the same way.
@@ -127,5 +237,5 @@ function tvf_parse_filter_param( string $f ): array {
 			$out[] = $slug;
 		}
 	}
-	return array_values( array_unique( $out ) );
+	return tvf_normalize_selection( array_values( array_unique( $out ) ) );
 }

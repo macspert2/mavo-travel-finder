@@ -36,12 +36,64 @@
 	}
 
 	// -------------------------------------------------------------------------
+	// Single-choice groups
+	//
+	// Categories flagged 'single' in the PHP registry (saison, durée) allow one
+	// pick at a time — results are ANDed, so two seasons at once could only
+	// match zero posts. The rule reaches JS through data-single-group on each
+	// chip, so there is no second copy of the registry to keep in sync.
+	// -------------------------------------------------------------------------
+
+	const singleGroupOf = {};
+	wrap.querySelectorAll( '.tvf-chip[data-single-group]' ).forEach( function ( chip ) {
+		singleGroupOf[ chip.dataset.slug ] = chip.dataset.singleGroup;
+	} );
+
+	/** The selection that results from clicking `slug` while `selected` is active. */
+	function toggleSelection( slug, selected ) {
+		if ( selected.indexOf( slug ) >= 0 ) {
+			return selected.filter( s => s !== slug );
+		}
+		const group = singleGroupOf[ slug ];
+		const kept  = group
+			? selected.filter( s => singleGroupOf[ s ] !== group )
+			: selected.slice();
+		kept.push( slug );
+		return kept;
+	}
+
+	/** At most one pick per single-choice group, last one winning — mirrors tvf_normalize_selection(). */
+	function normalizeSelection( slugs ) {
+		const seen = {};
+		const out  = [];
+		for ( let i = slugs.length - 1; i >= 0; i-- ) {
+			const group = singleGroupOf[ slugs[ i ] ];
+			if ( group ) {
+				if ( seen[ group ] ) continue;
+				seen[ group ] = true;
+			}
+			out.unshift( slugs[ i ] );
+		}
+		return out;
+	}
+
+	/** Repaints every chip's on/off state and href from a selection. */
+	function paintChips( selected ) {
+		wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( c ) {
+			const on = selected.includes( c.dataset.slug );
+			c.classList.toggle( 'is-on', on );
+			c.setAttribute( 'aria-checked', on ? 'true' : 'false' );
+			c.href = buildUrl( toggleSelection( c.dataset.slug, selected ) );
+		} );
+	}
+
+	// -------------------------------------------------------------------------
 	// URL helpers
 	// -------------------------------------------------------------------------
 
 	function getSelected() {
 		const f = new URL( window.location.href ).searchParams.get( 'f' ) || '';
-		return f ? f.split( ',' ).filter( Boolean ) : [];
+		return f ? normalizeSelection( f.split( ',' ).filter( Boolean ) ) : [];
 	}
 
 	function baseUrl() {
@@ -238,29 +290,9 @@
 
 		e.preventDefault();
 
-		const slug     = chip.dataset.slug;
-		let   selected = getSelected();
-		const idx      = selected.indexOf( slug );
+		const selected = toggleSelection( chip.dataset.slug, getSelected() );
 
-		if ( idx >= 0 ) {
-			selected.splice( idx, 1 );
-		} else {
-			selected.push( slug );
-		}
-
-		wrap.querySelectorAll( '.tvf-chip[data-slug="' + slug + '"]' ).forEach( c => {
-			c.classList.toggle( 'is-on', idx < 0 );
-			c.setAttribute( 'aria-checked', idx < 0 ? 'true' : 'false' );
-		} );
-
-		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
-			const s    = c.dataset.slug;
-			const on   = selected.includes( s );
-			const next = on
-				? selected.filter( x => x !== s )
-				: [ ...selected, s ];
-			c.href = buildUrl( next );
-		} );
+		paintChips( selected );
 
 		history.pushState( { f: selected.join( ',' ) }, '', buildUrl( selected ) );
 		updateSummary( selected );
@@ -271,11 +303,7 @@
 	// Browser back/forward
 	window.addEventListener( 'popstate', function () {
 		const selected = getSelected();
-		wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
-			const on = selected.includes( c.dataset.slug );
-			c.classList.toggle( 'is-on', on );
-			c.setAttribute( 'aria-checked', on ? 'true' : 'false' );
-		} );
+		paintChips( selected );
 		updateSummary( selected );
 		loadResults( selected );
 		setCookie( COOKIE_NAME, selected.join( ',' ), COOKIE_DAYS );
@@ -285,10 +313,7 @@
 	if ( resetBtn && resetBtn.tagName === 'BUTTON' ) {
 		resetBtn.addEventListener( 'click', function () {
 			history.pushState( { f: '' }, '', baseUrl() );
-			wrap.querySelectorAll( '.tvf-chip' ).forEach( c => {
-				c.classList.remove( 'is-on' );
-				c.setAttribute( 'aria-checked', 'false' );
-			} );
+			paintChips( [] );
 			updateSummary( [] );
 			loadResults( [] );
 			setCookie( COOKIE_NAME, '', COOKIE_DAYS );
@@ -380,18 +405,12 @@
 	if ( ! new URL( window.location.href ).searchParams.has( 'f' ) ) {
 		const saved = getCookie( COOKIE_NAME );
 		if ( saved ) {
-			const slugs = saved.split( ',' ).filter( Boolean );
+			// normalizeSelection() also repairs cookies written before saison/durée
+			// became single-choice, which would otherwise restore an empty result set.
+			const slugs = normalizeSelection( saved.split( ',' ).filter( Boolean ) );
 			if ( slugs.length ) {
-				history.replaceState( { f: saved }, '', buildUrl( slugs ) );
-				wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( c ) {
-					const on = slugs.includes( c.dataset.slug );
-					c.classList.toggle( 'is-on', on );
-					c.setAttribute( 'aria-checked', on ? 'true' : 'false' );
-					const next = on
-						? slugs.filter( x => x !== c.dataset.slug )
-						: [ ...slugs, c.dataset.slug ];
-					c.href = buildUrl( next );
-				} );
+				history.replaceState( { f: slugs.join( ',' ) }, '', buildUrl( slugs ) );
+				paintChips( slugs );
 				updateSummary( slugs );
 				loadResults( slugs );
 			}
