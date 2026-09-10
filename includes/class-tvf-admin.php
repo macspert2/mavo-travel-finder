@@ -14,6 +14,7 @@ class TVF_Admin {
 		add_action( 'wp_ajax_tvf_get_weights', [ __CLASS__, 'ajax_get_weights' ] );
 		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
 		add_action( 'admin_post_tvf_clear_cache', [ __CLASS__, 'handle_clear_cache' ] );
+		add_action( 'admin_post_tvf_export',      [ __CLASS__, 'handle_export' ] );
 		add_action( 'admin_post_tvf_sync_translations', [ __CLASS__, 'handle_sync_translations' ] );
 		add_action( 'admin_post_tvf_save_settings', [ __CLASS__, 'handle_save_settings' ] );
 	}
@@ -50,8 +51,8 @@ class TVF_Admin {
 		);
 		add_submenu_page(
 			'travel-finder',
-			__( 'Importer CSV', 'travel-finder' ),
-			__( 'Importer CSV', 'travel-finder' ),
+			__( 'Import / Export CSV', 'travel-finder' ),
+			__( 'Import / Export CSV', 'travel-finder' ),
 			'manage_options',
 			'travel-finder-import',
 			[ __CLASS__, 'render_import_page' ]
@@ -298,9 +299,12 @@ class TVF_Admin {
 			}
 			$result = TVF_Importer::import_csv( $_FILES['tvf_csv']['tmp_name'], $lang );
 		}
+
+		// After the import, so the export counts reflect what was just added.
+		$counts = TVF_Store::count_weighted_posts();
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Travel Finder — Importer CSV', 'travel-finder' ); ?></h1>
+			<h1><?php esc_html_e( 'Travel Finder — Import / Export CSV', 'travel-finder' ); ?></h1>
 
 			<?php if ( null !== $result ) : ?>
 				<div class="notice notice-<?php echo $result['errors'] ? 'warning' : 'success'; ?> is-dismissible">
@@ -319,6 +323,8 @@ class TVF_Admin {
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>
+
+			<h2><?php esc_html_e( 'Importer', 'travel-finder' ); ?></h2>
 
 			<p><?php esc_html_e( 'Importez le fichier CSV des poids. La première ligne (en-tête) est ignorée. Les colonnes doivent rester dans l\'ordre d\'origine.', 'travel-finder' ); ?></p>
 
@@ -348,8 +354,64 @@ class TVF_Admin {
 				</table>
 				<?php submit_button( __( 'Importer', 'travel-finder' ) ); ?>
 			</form>
+
+			<hr>
+
+			<h2><?php esc_html_e( 'Exporter', 'travel-finder' ); ?></h2>
+
+			<p><?php esc_html_e( 'Téléchargez les poids enregistrés au même format que l\'import : le fichier peut être modifié puis réimporté tel quel.', 'travel-finder' ); ?></p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'tvf_export', 'tvf_export_nonce' ); ?>
+				<input type="hidden" name="action" value="tvf_export">
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<label for="tvf_export_lang"><?php esc_html_e( 'Langue', 'travel-finder' ); ?></label>
+						</th>
+						<td>
+							<select name="tvf_export_lang" id="tvf_export_lang">
+								<?php foreach ( [ 'fr' => 'FR', 'en' => 'EN', 'de' => 'DE' ] as $code => $label ) : ?>
+									<option value="<?php echo esc_attr( $code ); ?>">
+										<?php
+										$n = $counts[ $code ] ?? 0;
+										printf(
+											/* translators: 1: language code, 2: number of posts with weights */
+											esc_html__( '%1$s — %2$d article(s)', 'travel-finder' ),
+											esc_html( $label ),
+											(int) $n
+										);
+										?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Exporter', 'travel-finder' ), 'secondary' ); ?>
+			</form>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Serves the CSV export. Lives on admin_post_ rather than inside the page
+	 * renderer because export_csv() sends headers and writes to php://output,
+	 * which cannot happen once any markup has been emitted.
+	 */
+	public static function handle_export(): void {
+		check_admin_referer( 'tvf_export', 'tvf_export_nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
+		}
+
+		$lang = sanitize_key( $_POST['tvf_export_lang'] ?? 'fr' );
+		if ( ! in_array( $lang, [ 'fr', 'en', 'de' ], true ) ) {
+			$lang = 'fr';
+		}
+
+		TVF_Importer::export_csv( $lang );
 	}
 
 	// -------------------------------------------------------------------------

@@ -4,6 +4,61 @@ defined( 'ABSPATH' ) || exit;
 class TVF_Importer {
 
 	/**
+	 * The CSV column order, shared by import and export so a file exported
+	 * here re-imports unchanged. Column 0 is post_id; the rest follow
+	 * tvf_get_all_slugs(), which is also what import_csv() reads positionally.
+	 *
+	 * @return string[]
+	 */
+	public static function csv_columns(): array {
+		return array_merge( [ 'post_id' ], tvf_get_all_slugs() );
+	}
+
+	/**
+	 * Streams every stored weight for one language as a CSV download.
+	 *
+	 * Emits the exact shape import_csv() expects — same header, same column
+	 * order, missing weights written as 0 — so export → edit → import is a
+	 * clean round trip.
+	 *
+	 * Writes to php://output and exits, so it must run before any markup: it
+	 * is called from an admin_post_ handler, never from a page renderer.
+	 *
+	 * No UTF-8 BOM. Excel sometimes wants one, but it would corrupt the first
+	 * header cell for anything parsing the file strictly, and every value here
+	 * is an ASCII slug or an integer, so there is nothing for it to fix.
+	 */
+	public static function export_csv( string $lang = 'fr' ): void {
+		$slugs   = tvf_get_all_slugs();
+		$weights = TVF_Store::all_weights( $lang );
+
+		$filename = sprintf( 'travel-finder-weights-%s-%s.csv', $lang, gmdate( 'Y-m-d' ) );
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=' . $filename );
+
+		$out = fopen( 'php://output', 'w' );
+
+		// Explicit $escape: it defaults to a backslash today but PHP 8.4 deprecates
+		// relying on that, and '' is the value it is moving to. Every field here is
+		// an integer or an ASCII slug, so there is nothing to escape either way —
+		// but import and export must agree, so both sides pass it.
+		fputcsv( $out, self::csv_columns(), ',', '"', '' );
+
+		foreach ( $weights as $post_id => $row ) {
+			$line = [ $post_id ];
+			foreach ( $slugs as $slug ) {
+				$line[] = $row[ $slug ] ?? 0;
+			}
+			fputcsv( $out, $line, ',', '"', '' );
+		}
+
+		fclose( $out );
+		exit;
+	}
+
+	/**
 	 * Imports a CSV file into the tvf_post_filter table.
 	 *
 	 * Expected CSV:
@@ -27,7 +82,7 @@ class TVF_Importer {
 		$count   = 0;
 		$row_num = 0;
 
-		while ( ( $row = fgetcsv( $handle ) ) !== false ) {
+		while ( ( $row = fgetcsv( $handle, 0, ',', '"', '' ) ) !== false ) {
 			++$row_num;
 
 			if ( $row_num === 1 ) {

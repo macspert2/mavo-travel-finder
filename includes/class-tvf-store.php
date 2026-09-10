@@ -218,6 +218,60 @@ class TVF_Store {
 		] );
 	}
 
+	/**
+	 * Every stored weight for one language, keyed post_id => slug => weight.
+	 *
+	 * One query rather than get_weights() per post: an export covers the whole
+	 * table, and the per-post form would be a few thousand round trips.
+	 *
+	 * @return array<int, array<string,int>> Ordered by post_id ascending.
+	 */
+	public static function all_weights( string $lang ): array {
+		global $wpdb;
+		$table = self::table_name();
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_id, filter_slug, weight
+				   FROM {$table}
+				  WHERE lang = %s
+				  ORDER BY post_id ASC",
+				$lang
+			),
+			ARRAY_A
+		);
+
+		$out = [];
+		foreach ( $rows ?: [] as $row ) {
+			$out[ (int) $row['post_id'] ][ $row['filter_slug'] ] = (int) $row['weight'];
+		}
+
+		return $out;
+	}
+
+	/**
+	 * How many posts carry weights, per language — for the export UI, so the
+	 * operator can see there is something to download before clicking.
+	 *
+	 * @return array<string,int> Keyed by lang; languages with no rows are absent.
+	 */
+	public static function count_weighted_posts(): array {
+		global $wpdb;
+		$table = self::table_name();
+
+		$rows = $wpdb->get_results(
+			"SELECT lang, COUNT(DISTINCT post_id) AS n FROM {$table} GROUP BY lang",
+			ARRAY_A
+		);
+
+		$out = [];
+		foreach ( $rows ?: [] as $row ) {
+			$out[ (string) $row['lang'] ] = (int) $row['n'];
+		}
+
+		return $out;
+	}
+
 	// -------------------------------------------------------------------------
 	// Write
 	// -------------------------------------------------------------------------
