@@ -10,6 +10,38 @@ class TVF_Store {
 	 */
 	const RESULT_CACHE_PREFIX = 'tvf_r7_';
 
+	/** Per-language cache generation counter. See cache_key(). */
+	const CACHE_GEN_OPTION_PREFIX = 'tvf_cache_gen_';
+
+	/** Dead-slug set cache prefix; the sibling of RESULT_CACHE_PREFIX. */
+	const DEAD_CACHE_PREFIX = 'tvf_dead_';
+
+	/**
+	 * Builds a transient key carrying the current cache generation for $lang.
+	 *
+	 * Invalidation works by bumping that generation rather than deleting rows.
+	 * The old approach — DELETE FROM wp_options WHERE option_name LIKE
+	 * 'prefix%' — ran on every post save and took next-key locks across every
+	 * index entry it visited, on a table that every page load writes to
+	 * (transients are 93% of its rows). That contention, not the scan, is what
+	 * profiled at 16s per save and, with a wider lock, 136s.
+	 *
+	 * Bumping one integer locks exactly one row. Entries from an older
+	 * generation become unreachable the instant it changes and lapse on their
+	 * own HOUR_IN_SECONDS TTL, so nothing has to be swept on the hot path.
+	 * It also behaves identically under a persistent object cache, where
+	 * transients are not wp_options rows at all and the LIKE sweep silently
+	 * cleared nothing.
+	 */
+	public static function cache_key( string $prefix, string $lang, string $suffix ): string {
+		return $prefix . self::cache_generation( $lang ) . '_' . $lang . '_' . $suffix;
+	}
+
+	/** Current cache generation for a language. Starts at 1. */
+	public static function cache_generation( string $lang ): int {
+		return max( 1, (int) get_option( self::CACHE_GEN_OPTION_PREFIX . $lang, 1 ) );
+	}
+
 	public static function table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'tvf_post_filter';
@@ -190,30 +222,70 @@ class TVF_Store {
 	// Write
 	// -------------------------------------------------------------------------
 
-	/** Upserts all weights for a post+lang and busts the result cache. */
-	public static function save_weights( int $post_id, string $lang, array $weights ): void {
+	/**
+	 * Upserts a post's filter weights and busts the result cache — but only
+	 * for the weights that actually changed.
+	 *
+	 * This runs from save_post on every post save carrying the metabox nonce,
+	 * whether or not the editor touched a single filter. It used to REPLACE
+	 * one row per registered slug and then sweep wp_options unconditionally,
+	 * which profiled at ~16s of a single real save. The overwhelming majority
+	 * of saves change nothing here, so the diff below reduces them to one
+	 * SELECT and no writes at all.
+	 *
+	 * @param bool $bust Pass false when the caller sweeps the cache itself
+	 *                   after a batch, so an import of N rows sweeps
+	 *                   wp_options once rather than N times.
+	 */
+	public static function save_weights( int $post_id, string $lang, array $weights, bool $bust = true ): void {
 		global $wpdb;
 		$table   = self::table_name();
 		$allowed = array_flip( tvf_get_all_slugs() );
 
+		// Normalise before comparing: the column is a clamped int and
+		// get_weights() returns strings, so the two sides have to be made
+		// like-for-like or every save looks like a change.
+		$incoming = [];
 		foreach ( $weights as $slug => $weight ) {
 			$slug = (string) $slug;
-			if ( ! isset( $allowed[ $slug ] ) ) {
-				continue;
+			if ( isset( $allowed[ $slug ] ) ) {
+				$incoming[ $slug ] = max( 0, min( 2, (int) $weight ) );
 			}
+		}
+
+		if ( ! $incoming ) {
+			return;
+		}
+
+		$current = array_map( 'intval', self::get_weights( $post_id, $lang ) );
+
+		$changed = [];
+		foreach ( $incoming as $slug => $weight ) {
+			if ( ! array_key_exists( $slug, $current ) || $current[ $slug ] !== $weight ) {
+				$changed[ $slug ] = $weight;
+			}
+		}
+
+		if ( ! $changed ) {
+			return;
+		}
+
+		foreach ( $changed as $slug => $weight ) {
 			$wpdb->replace(
 				$table,
 				[
 					'post_id'     => $post_id,
 					'lang'        => $lang,
 					'filter_slug' => $slug,
-					'weight'      => max( 0, min( 2, (int) $weight ) ),
+					'weight'      => $weight,
 				],
 				[ '%d', '%s', '%s', '%d' ]
 			);
 		}
 
-		self::bust_cache( $lang );
+		if ( $bust ) {
+			self::bust_cache( $lang );
+		}
 	}
 
 	/**
@@ -264,9 +336,17 @@ class TVF_Store {
 					continue;
 				}
 
-				self::save_weights( (int) $translated_id, $lang, $weights );
+				self::save_weights( (int) $translated_id, $lang, $weights, false );
 				++$synced;
 				++$languages[ $lang ];
+			}
+		}
+
+		// One sweep per language after the whole run, rather than one per
+		// post written — this loop can touch every translated post on the site.
+		foreach ( [ 'en', 'de' ] as $lang ) {
+			if ( $languages[ $lang ] > 0 ) {
+				self::bust_cache( $lang );
 			}
 		}
 
@@ -330,7 +410,7 @@ class TVF_Store {
 	 */
 	private static function dead_slugs_for_context( string $lang, array $selected_slugs ): array {
 		sort( $selected_slugs ); // canonical order for cache key
-		$cache_key = 'tvf_dead_' . $lang . '_' . md5( implode( ',', $selected_slugs ) );
+		$cache_key = self::cache_key( self::DEAD_CACHE_PREFIX, $lang, md5( implode( ',', $selected_slugs ) ) );
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -479,15 +559,55 @@ class TVF_Store {
 	// Cache
 	// -------------------------------------------------------------------------
 
+	/**
+	 * Invalidates every cached result page and dead-slug set for one language.
+	 *
+	 * O(1): one option row, whatever the cache holds. Safe to call on every
+	 * save. See cache_key() for why this replaced a LIKE sweep of wp_options.
+	 *
+	 * The counter only has to *change*, so two concurrent bumps racing to the
+	 * same value still invalidate correctly — no locking needed.
+	 */
 	public static function bust_cache( string $lang ): void {
+		$option = self::CACHE_GEN_OPTION_PREFIX . $lang;
+
+		// autoload = false: this is read on demand, never needed on every page.
+		update_option( $option, self::cache_generation( $lang ) + 1, false );
+	}
+
+	/**
+	 * Physically removes orphaned cache rows, every language and generation.
+	 *
+	 * Superseded rows are already unreachable and expire on their own, so this
+	 * is housekeeping, not invalidation — it belongs on the manual "clear
+	 * cache" button and cleanup routines, never on save_post.
+	 *
+	 * Not per-language by design: the generation now sits between the prefix
+	 * and the language, so an anchored prefix match cannot select one language
+	 * without also pinning a generation. Sweeping everything is what a manual
+	 * purge wants anyway.
+	 *
+	 * Deliberately four separate statements. Collapsing them into one
+	 * DELETE ... WHERE a LIKE %s OR a LIKE %s OR ... looks like an obvious win
+	 * and is not: MySQL will not combine four OR'd prefix patterns into four
+	 * ranges on the option_name index. EXPLAIN on this table:
+	 *
+	 *     one pattern   -> type=range, rows=1215
+	 *     four OR'd     -> type=index, rows=8443   (full index scan)
+	 *
+	 * A range DELETE locks only the rows it visits; a full index scan locks
+	 * essentially the whole option_name index for the length of the
+	 * transaction. Keep each pattern anchored, with no leading wildcard.
+	 */
+	public static function purge_cache_rows(): void {
 		global $wpdb;
 
-		foreach ( [ self::RESULT_CACHE_PREFIX, 'tvf_dead_' ] as $prefix_base ) {
+		foreach ( [ self::RESULT_CACHE_PREFIX, self::DEAD_CACHE_PREFIX ] as $prefix_base ) {
 			foreach ( [ '_transient_', '_transient_timeout_' ] as $type ) {
 				$wpdb->query(
 					$wpdb->prepare(
 						"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-						$wpdb->esc_like( $type . $prefix_base . $lang ) . '%'
+						$wpdb->esc_like( $type . $prefix_base ) . '%'
 					)
 				);
 			}

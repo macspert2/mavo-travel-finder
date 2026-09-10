@@ -60,13 +60,14 @@ class TVF_Importer {
 				$weights[ $slug ] = ( '' === $raw ) ? 0 : max( 0, min( 2, (int) $raw ) );
 			}
 
-			TVF_Store::save_weights( $post_id, $lang, $weights );
+			TVF_Store::save_weights( $post_id, $lang, $weights, false );
 			++$count;
 		}
 
 		fclose( $handle );
 
-		// Single cache bust after all rows (save_weights busts per-row; one final sweep).
+		// Single cache bust after all rows — save_weights() is called with
+		// $bust = false above precisely so this is the only sweep.
 		TVF_Store::bust_cache( $lang );
 
 		return [ 'imported' => $count, 'errors' => $errors ];

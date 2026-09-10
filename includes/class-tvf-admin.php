@@ -667,9 +667,15 @@ class TVF_Admin {
 			wp_die( esc_html__( 'Accès refusé.', 'travel-finder' ) );
 		}
 
+		// Bump every generation so live entries are unreachable immediately,
+		// then sweep the orphans out of wp_options. The sweep is safe here
+		// because this is a deliberate, rare admin action rather than the
+		// save_post hot path.
 		foreach ( [ 'fr', 'en', 'de' ] as $lang ) {
 			TVF_Store::bust_cache( $lang );
 		}
+
+		TVF_Store::purge_cache_rows();
 
 		wp_safe_redirect(
 			add_query_arg(
