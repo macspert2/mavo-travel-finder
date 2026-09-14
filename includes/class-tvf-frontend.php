@@ -27,8 +27,14 @@ class TVF_Frontend {
 			return;
 		}
 
-		wp_enqueue_style( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.css', [], TVF_VERSION );
-		wp_enqueue_script( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.js', [], TVF_VERSION, true );
+		// mtime rather than TVF_VERSION: a CSS or JS edit that does not also bump
+		// the constant would otherwise keep serving the previous file through
+		// Autoptimize, Cloudflare and the browser alike.
+		$css = TVF_PLUGIN_DIR . 'assets/frontend.css';
+		$js  = TVF_PLUGIN_DIR . 'assets/frontend.js';
+
+		wp_enqueue_style( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.css', [], file_exists( $css ) ? filemtime( $css ) : TVF_VERSION );
+		wp_enqueue_script( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.js', [], file_exists( $js ) ? filemtime( $js ) : TVF_VERSION, true );
 		// No REST nonce: /tvf/v1/results is public read-only (permission_callback __return_true),
 		// and a cached nonce goes stale for visitors served from a page cache, breaking the finder.
 		wp_localize_script( 'tvf-frontend', 'tvfFrontend', [
