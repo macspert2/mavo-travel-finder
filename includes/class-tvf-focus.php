@@ -42,11 +42,16 @@ class TVF_Focus {
 			return;
 		}
 
+		// Same handle and same mtime versioning the child theme itself uses, so
+		// whichever enqueue runs first produces the same ?ver=. The theme version
+		// did not change when the stylesheet did, and caches kept the old file.
+		$css = get_stylesheet_directory() . '/assets/css/mv-home.css';
+
 		wp_enqueue_style(
 			'mv-home',
 			get_stylesheet_directory_uri() . '/assets/css/mv-home.css',
 			[],
-			wp_get_theme()->get( 'Version' )
+			file_exists( $css ) ? filemtime( $css ) : wp_get_theme()->get( 'Version' )
 		);
 	}
 
