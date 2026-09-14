@@ -16,8 +16,10 @@
   --tvf-white:        #ffffff;
   --tvf-shadow:       0 4px 24px rgba(26, 26, 46, 0.09);
   --tvf-shadow-hover: 0 12px 40px rgba(26, 26, 46, 0.18);
-  --tvf-radius-card:  12px;
-  --tvf-radius-chip:  100px;
+  /* Structure follows the site contract; the palette below stays this
+     plugin's own, which is a deliberate identity rather than drift. */
+  --tvf-radius-card:  var(--mv-tile-radius, 4px);
+  --tvf-radius-chip:  var(--mv-radius-pill, 999px);
   --tvf-transition:   0.22s cubic-bezier(0.4, 0, 0.2, 1);
   --tvf-font:         -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
@@ -380,7 +382,7 @@
   border: none;
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--mv-tile-radius, 4px);
   transition: color var(--tvf-transition), background var(--tvf-transition);
   font-family: var(--tvf-font);
 }
