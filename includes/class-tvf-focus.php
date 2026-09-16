@@ -12,9 +12,18 @@ defined( 'ABSPATH' ) || exit;
  */
 class TVF_Focus {
 
-	/** Full-finder page per language — only French exists today; languages with no entry just don't get an escalation link. */
+	/**
+	 * Full-finder page per language. A language with no entry simply gets no
+	 * escalation link rather than a link to another language's page.
+	 *
+	 * These are the pages hosting [travel_finder]; the focus pages hosting
+	 * [travel_finder_focus] are different URLs again (/nos-idees-de-voyage/,
+	 * /en/our-travel-ideas/, /de/unsere-reiseideen/) and live in the theme.
+	 */
 	const FULL_FINDER_URLS = [
 		'fr' => 'https://www.mamanvoyage.com/ou-partir-trouvez-votre-prochain-voyage/',
+		'en' => 'https://www.mamanvoyage.com/en/where-to/',
+		'de' => 'https://www.mamanvoyage.com/de/wohin-reisen/',
 	];
 
 	public static function init(): void {
