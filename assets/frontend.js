@@ -18,6 +18,21 @@
 	let   nextOffset = BATCH;
 
 	// -------------------------------------------------------------------------
+	// Strings
+	//
+	// Localized by TVF_Frontend::enqueue_assets(), which is the single source:
+	// this script rebuilds the summary and count lines after every chip click,
+	// and used to carry its own hardcoded French for them — which reverted a
+	// translated page to French on the first interaction. The `||` fallbacks
+	// below are French only, so that a stale cached copy of this file served
+	// against an older PHP payload still renders something. Add a new string to
+	// the PHP table (TVF_Frontend::text()), never here.
+	// -------------------------------------------------------------------------
+
+	const i18n  = tvfFrontend.i18n || {};
+	const COUNT = i18n.count || {};
+
+	// -------------------------------------------------------------------------
 	// Cookie helpers — remember last filter state for returning visitors
 	// -------------------------------------------------------------------------
 
@@ -229,13 +244,14 @@
 		const el = summaryText || summary;
 		if ( ! slugs.length ) {
 			el.innerHTML = '<span class="tvf-summary-empty">'
-				+ escHtml( summary.dataset.emptyText || 'Aucun filtre sélectionné — destinations populaires.' )
+				+ escHtml( i18n.summaryEmpty || 'Aucun filtre sélectionné — destinations populaires.' )
 				+ '</span>';
 			return;
 		}
 		const labels = [];
 		wrap.querySelectorAll( '.tvf-chip.is-on' ).forEach( c => labels.push( c.textContent.trim() ) );
-		el.innerHTML = '<strong>Votre sélection : </strong>' + escHtml( labels.join( ', ' ) );
+		el.innerHTML = '<strong>' + escHtml( i18n.summaryPrefix || 'Votre sélection : ' ) + '</strong>'
+			+ escHtml( labels.join( ', ' ) );
 	}
 
 	function updateResetBtn( slugs ) {
@@ -252,19 +268,17 @@
 		return str.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
 	}
 
+	/** Mirrors TVF_Frontend::format_count(), including its non-breaking space. */
 	function formatCount( total, hasFilters ) {
 		if ( total === 0 ) {
-			return lang === 'en' ? 'No matching ideas.'
-			     : lang === 'de' ? 'Keine passenden Ideen.'
-			     : 'Aucune idée ne correspond à cette sélection.';
+			return COUNT.none || 'Aucune idée ne correspond à cette sélection.';
 		}
-		var noun = total === 1
-			? ( lang === 'en' ? 'idea found' : lang === 'de' ? 'Idee gefunden' : 'idée trouvée' )
-			: ( lang === 'en' ? 'ideas found' : lang === 'de' ? 'Ideen gefunden' : 'idées trouvées' );
-		var suffix = hasFilters
-			? ( lang === 'en' ? ' for your selection' : lang === 'de' ? ' für Ihre Auswahl' : ' pour votre sélection' )
-			: '';
-		return total + ' ' + noun + suffix;
+		var noun   = total === 1
+			? ( COUNT.one  || 'idée trouvée' )
+			: ( COUNT.many || 'idées trouvées' );
+		var suffix = hasFilters ? ( COUNT.suffix || ' pour votre sélection' ) : '';
+
+		return total + '\u00A0' + noun + suffix;
 	}
 
 	function updateCount( total ) {

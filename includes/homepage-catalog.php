@@ -249,9 +249,9 @@ function tvf_get_homepage_catalog_entry( string $key ): ?array {
 	return null;
 }
 
-/** Resolves a language-keyed catalog text field (label/description) to a single string, falling back to French if the requested language isn't translated yet. */
+/** Resolves a language-keyed catalog text field (label/description) to a single string, falling back to French if the requested language isn't translated yet. Catalog-facing alias of tvf_resolve_text(), which filters-registry.php defines for the same job. */
 function tvf_resolve_catalog_text( array $field, string $lang ): string {
-	return $field[ $lang ] ?? $field['fr'] ?? '';
+	return tvf_resolve_text( $field, $lang );
 }
 
 /**

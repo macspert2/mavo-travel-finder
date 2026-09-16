@@ -131,11 +131,7 @@ class TVF_Focus {
 			}
 		}
 
-		// tvf_get_slug_labels() is French-only today, so this joined-label
-		// path (for filter combos with no matching catalog entry) will
-		// still show French text on en/de pages until those are
-		// translated too — known gap, not hit by any curated tile today.
-		$labels = tvf_get_slug_labels();
+		$labels = tvf_get_slug_labels( $lang );
 		$names  = array_filter( array_map( static fn( $s ) => $labels[ $s ] ?? null, $slugs ) );
 
 		if ( $names ) {
@@ -151,7 +147,7 @@ class TVF_Focus {
 			'no_results'    => [
 				'fr' => 'Aucun voyage ne correspond à votre sélection pour le moment.',
 				'en' => 'No trips match your selection just yet.',
-				'de' => 'Für deine Auswahl gibt es aktuell keine Treffer.',
+				'de' => 'Für Deine Auswahl gibt es aktuell keine Treffer.',
 			],
 			'refine'        => [
 				'fr' => 'Affiner votre recherche',

@@ -35,10 +35,22 @@ class TVF_Frontend {
 
 		wp_enqueue_style( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.css', [], file_exists( $css ) ? filemtime( $css ) : TVF_VERSION );
 		wp_enqueue_script( 'tvf-frontend', TVF_PLUGIN_URL . 'assets/frontend.js', [], file_exists( $js ) ? filemtime( $js ) : TVF_VERSION, true );
+		$lang = self::current_lang();
+
 		// No REST nonce: /tvf/v1/results is public read-only (permission_callback __return_true),
 		// and a cached nonce goes stale for visitors served from a page cache, breaking the finder.
+		//
+		// The i18n block is the only copy of these strings the script has: frontend.js
+		// rebuilds the summary and count lines after every chip click, and used to carry
+		// its own hardcoded French for them, which reverted a translated page to French
+		// on the first interaction.
 		wp_localize_script( 'tvf-frontend', 'tvfFrontend', [
 			'restUrl' => rest_url( 'tvf/v1/results' ),
+			'i18n'    => [
+				'summaryPrefix' => self::text( 'summary_prefix', $lang ),
+				'summaryEmpty'  => self::text( 'summary_empty', $lang ),
+				'count'         => self::count_strings( $lang ),
+			],
 		] );
 	}
 
@@ -184,15 +196,11 @@ class TVF_Frontend {
 
 		$lang     = self::current_lang();
 		$selected = self::requested_filters();
-		$registry = tvf_get_registry();
+		$registry = tvf_get_registry( $lang );
 		$base_url = self::base_url();
 
-		$intro         = $atts['intro'] ?: __( 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.', 'travel-finder' );
-		$results_title = match ( $lang ) {
-			'en'    => __( 'Travel ideas for you', 'travel-finder' ),
-			'de'    => __( 'Reiseideen für Sie', 'travel-finder' ),
-			default => __( 'Nos idées de voyage pour vous :', 'travel-finder' ),
-		};
+		$intro         = $atts['intro'] ?: self::text( 'intro', $lang );
+		$results_title = self::text( 'results_title', $lang );
 		$dead_slugs    = TVF_Store::compute_dead_slugs( $lang, $selected );
 
 		ob_start();
@@ -202,7 +210,7 @@ class TVF_Frontend {
 			<div class="tvf-intro-row">
 				<div class="tvf-intro"><?php echo esc_html( $intro ); ?></div>
 				<button type="button" class="tvf-share-btn" id="tvf-share"
-						aria-label="<?php esc_attr_e( 'Partager', 'travel-finder' ); ?>">
+						aria-label="<?php echo esc_attr( self::text( 'share', $lang ) ); ?>">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
 						 stroke="currentColor" stroke-width="2"
 						 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -215,20 +223,20 @@ class TVF_Frontend {
 				</button>
 			</div>
 			<p class="mv-share-status" id="tvf-share-tooltip" aria-live="polite" hidden>
-				<?php esc_html_e( 'URL copiée — partagez par e-mail, message ou réseau social !', 'travel-finder' ); ?>
+				<?php echo esc_html( self::text( 'share_copied', $lang ) ); ?>
 			</p>
 
 			<div class="tvf-summary" id="tvf-summary">
 				<span id="tvf-summary-text" aria-live="polite">
-					<?php echo self::render_summary( $selected, $registry ); ?>
+					<?php echo self::render_summary( $selected, $lang ); ?>
 				</span>
 				<?php if ( $selected ) : ?>
 					<a href="<?php echo esc_url( $base_url ); ?>" class="tvf-reset-btn" id="tvf-reset">
-						<?php esc_html_e( 'Réinitialiser', 'travel-finder' ); ?>
+						<?php echo esc_html( self::text( 'reset', $lang ) ); ?>
 					</a>
 				<?php else : ?>
 					<button type="button" class="tvf-reset-btn" id="tvf-reset" hidden>
-						<?php esc_html_e( 'Réinitialiser', 'travel-finder' ); ?>
+						<?php echo esc_html( self::text( 'reset', $lang ) ); ?>
 					</button>
 				<?php endif; ?>
 			</div>
@@ -250,7 +258,7 @@ class TVF_Frontend {
 
 			<div id="tvf-load-more-wrap" class="tvf-load-more-wrap"<?php echo $cards['has_more'] ? '' : ' hidden'; ?>>
 				<button type="button" class="tvf-load-more-btn" id="tvf-load-more">
-					<?php esc_html_e( 'Voir plus', 'travel-finder' ); ?>
+					<?php echo esc_html( self::text( 'load_more', $lang ) ); ?>
 				</button>
 			</div>
 
@@ -352,35 +360,123 @@ class TVF_Frontend {
 		);
 	}
 
+	/**
+	 * Every visitor-facing string of the [travel_finder] shortcode, in one table.
+	 *
+	 * Per-language arrays rather than gettext, for the same reason as the filter
+	 * registry: this plugin ships no .po/.mo files, so __() only ever returned
+	 * its French literal. Same convention as TVF_Focus::text() and
+	 * homepage-catalog.php. Unknown languages fall back to French.
+	 *
+	 * The keys prefixed `count_` are mirrored in assets/frontend.js, which
+	 * rebuilds the count line client-side; they reach it through the i18n
+	 * payload in enqueue_assets(), so there is only one copy of the text.
+	 */
+	private static function text( string $key, string $lang ): string {
+		static $strings = [
+			'intro'          => [
+				'fr' => 'Sélectionnez vos critères pour trouver le voyage idéal parmi nos destinations.',
+				'en' => 'Choose your criteria to find the perfect trip among our destinations.',
+				'de' => 'Wähle Deine Kriterien und finde unter unseren Reisezielen die passende Reise.',
+			],
+			'results_title'  => [
+				'fr' => 'Nos idées de voyage pour vous :',
+				'en' => 'Travel ideas for you',
+				'de' => 'Reiseideen für Dich',
+			],
+			'share'          => [
+				'fr' => 'Partager',
+				'en' => 'Share',
+				'de' => 'Teilen',
+			],
+			'share_copied'   => [
+				'fr' => 'URL copiée — partagez par e-mail, message ou réseau social !',
+				'en' => 'URL copied — share it by email, message or social media!',
+				'de' => 'URL kopiert — teile sie per E-Mail, Nachricht oder in sozialen Netzwerken!',
+			],
+			'reset'          => [
+				'fr' => 'Réinitialiser',
+				'en' => 'Reset',
+				'de' => 'Zurücksetzen',
+			],
+			'load_more'      => [
+				'fr' => 'Voir plus',
+				'en' => 'Show more',
+				'de' => 'Mehr anzeigen',
+			],
+			'summary_empty'  => [
+				'fr' => 'Aucun filtre sélectionné — destinations populaires.',
+				'en' => 'No filters selected — popular destinations.',
+				'de' => 'Keine Filter ausgewählt — beliebte Reiseziele.',
+			],
+			// Note the French space before the colon; the other two must not have one.
+			'summary_prefix' => [
+				'fr' => 'Votre sélection : ',
+				'en' => 'Your selection: ',
+				'de' => 'Deine Auswahl: ',
+			],
+			'no_results'     => [
+				'fr' => 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.',
+				'en' => 'No trips match your selection. Try using fewer filters.',
+				'de' => 'Keine Reise entspricht Deiner Auswahl. Versuch es mit weniger Filtern.',
+			],
+			'count_none'     => [
+				'fr' => 'Aucune idée ne correspond à cette sélection.',
+				'en' => 'No matching ideas.',
+				'de' => 'Keine passenden Ideen.',
+			],
+			'count_one'      => [
+				'fr' => 'idée trouvée',
+				'en' => 'idea found',
+				'de' => 'Idee gefunden',
+			],
+			'count_many'     => [
+				'fr' => 'idées trouvées',
+				'en' => 'ideas found',
+				'de' => 'Ideen gefunden',
+			],
+			'count_suffix'   => [
+				'fr' => ' pour votre sélection',
+				'en' => ' for your selection',
+				'de' => ' für Deine Auswahl',
+			],
+		];
+
+		return isset( $strings[ $key ] ) ? tvf_resolve_text( $strings[ $key ], $lang ) : '';
+	}
+
+	/** The `count_*` strings, for the JS mirror of format_count(). */
+	private static function count_strings( string $lang ): array {
+		return [
+			'none'   => self::text( 'count_none', $lang ),
+			'one'    => self::text( 'count_one', $lang ),
+			'many'   => self::text( 'count_many', $lang ),
+			'suffix' => self::text( 'count_suffix', $lang ),
+		];
+	}
+
 	private static function format_count( int $count, array $selected, string $lang ): string {
 		if ( 0 === $count ) {
-			return match ( $lang ) {
-				'en'    => 'No matching ideas.',
-				'de'    => 'Keine passenden Ideen.',
-				default => 'Aucune idée ne correspond à cette sélection.',
-			};
+			return self::text( 'count_none', $lang );
 		}
-		$noun = 1 === $count
-			? match ( $lang ) { 'en' => 'idea found', 'de' => 'Idee gefunden', default => 'idée trouvée' }
-			: match ( $lang ) { 'en' => 'ideas found', 'de' => 'Ideen gefunden', default => 'idées trouvées' };
-		$suffix = ! empty( $selected )
-			? match ( $lang ) { 'en' => ' for your selection', 'de' => ' für Ihre Auswahl', default => ' pour votre sélection' }
-			: '';
+		$noun   = self::text( 1 === $count ? 'count_one' : 'count_many', $lang );
+		$suffix = ! empty( $selected ) ? self::text( 'count_suffix', $lang ) : '';
+
 		return $count . "\u{00A0}" . $noun . $suffix;
 	}
 
-	private static function render_summary( array $selected, array $registry ): string {
+	private static function render_summary( array $selected, string $lang ): string {
 		if ( empty( $selected ) ) {
 			return '<span class="tvf-summary-empty">'
-				. esc_html__( 'Aucun filtre sélectionné — destinations populaires.', 'travel-finder' )
+				. esc_html( self::text( 'summary_empty', $lang ) )
 				. '</span>';
 		}
-		$slug_labels = tvf_get_slug_labels();
+		$slug_labels = tvf_get_slug_labels( $lang );
 		$labels      = array_filter(
 			array_map( static fn( $s ) => $slug_labels[ $s ] ?? null, $selected )
 		);
 
-		return '<strong>' . esc_html__( 'Votre sélection : ', 'travel-finder' ) . '</strong>'
+		return '<strong>' . esc_html( self::text( 'summary_prefix', $lang ) ) . '</strong>'
 			. esc_html( implode( ', ', $labels ) );
 	}
 
@@ -423,7 +519,7 @@ class TVF_Frontend {
 			// offset>0: shouldn't happen in practice; return empty.
 			$inner = $offset === 0
 				? '<p class="tvf-no-results">'
-					. esc_html__( 'Aucun voyage ne correspond à votre sélection. Essayez avec moins de filtres.', 'travel-finder' )
+					. esc_html( self::text( 'no_results', $lang ) )
 					. '</p>'
 				: '';
 			$result = [
