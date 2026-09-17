@@ -11,6 +11,39 @@ defined( 'ABSPATH' ) || exit;
  */
 class TVF_Popular_Snapshots {
 
+	public static function table(): string {
+		global $wpdb;
+
+		return $wpdb->prefix . 'rpp_monthly_snapshots';
+	}
+
+	/**
+	 * Is the snapshot table actually there?
+	 *
+	 * It belongs to another plugin, so this one cannot assume it exists —
+	 * deactivate that plugin, or restore a database without it, and every
+	 * query below becomes a MySQL error logged on a page a visitor is reading.
+	 * The callers already tolerate an empty result (get_most_viewed() is the
+	 * documented fallback), so the missing table simply becomes one.
+	 *
+	 * Cached for the request: the check is one SHOW TABLES, but the callers
+	 * run per card on the homepage.
+	 */
+	public static function available(): bool {
+		static $available = null;
+
+		if ( null !== $available ) {
+			return $available;
+		}
+
+		global $wpdb;
+		$table = self::table();
+
+		return $available = ( (string) $wpdb->get_var(
+			$wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) )
+		) === $table );
+	}
+
 	/**
 	 * Top published posts by views for a specific calendar month, in a
 	 * given language. The snapshot table itself has no language column,
@@ -23,8 +56,12 @@ class TVF_Popular_Snapshots {
 	 * @return WP_Post[]
 	 */
 	public static function get_top_posts_for_month( string $month_date, string $lang = 'fr', int $limit = 6 ): array {
+		if ( ! self::available() ) {
+			return [];
+		}
+
 		global $wpdb;
-		$table = $wpdb->prefix . 'rpp_monthly_snapshots';
+		$table = self::table();
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(

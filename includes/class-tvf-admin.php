@@ -101,6 +101,9 @@ class TVF_Admin {
 				'error'    => __( 'Erreur lors de la sauvegarde.', 'travel-finder' ),
 				'copied'   => __( 'Copié depuis le modèle.', 'travel-finder' ),
 				'noPost'   => __( 'Choisissez d\'abord un article cible.', 'travel-finder' ),
+				// Read by admin.js when restoring the save button's label; it
+				// was the one string the script still carried a literal for.
+				'savedBtn' => __( 'Enregistrer', 'travel-finder' ),
 			],
 		] );
 	}
@@ -312,6 +315,12 @@ class TVF_Admin {
 						<?php
 						/* translators: %d: number of rows imported */
 						printf( esc_html__( '%d article(s) importé(s).', 'travel-finder' ), (int) $result['imported'] );
+
+						if ( ! empty( $result['synced'] ) ) {
+							echo ' ';
+							/* translators: %d: number of EN/DE translations updated */
+							printf( esc_html__( '%d traduction(s) EN/DE mise(s) à jour.', 'travel-finder' ), (int) $result['synced'] );
+						}
 						?>
 					</p>
 					<?php if ( $result['errors'] ) : ?>
@@ -443,6 +452,9 @@ class TVF_Admin {
 
 			<p>
 				<?php esc_html_e( 'Copie les poids de chaque article français vers ses traductions anglaise et allemande, via les liens de traduction Polylang — seuls les articles ayant une traduction existante sont mis à jour.', 'travel-finder' ); ?>
+			</p>
+			<p>
+				<?php esc_html_e( 'Cette synchronisation est désormais automatique : enregistrer un article français met aussitôt à jour ses traductions. Ce bouton reste utile après un import CSV, ou pour rattraper des traductions créées après coup.', 'travel-finder' ); ?>
 			</p>
 			<p>
 				<strong><?php esc_html_e( 'Attention :', 'travel-finder' ); ?></strong>
@@ -587,8 +599,7 @@ class TVF_Admin {
 	}
 
 	public static function render_meta_box( WP_Post $post ): void {
-		$lang     = function_exists( 'pll_get_post_language' ) ? (string) pll_get_post_language( $post->ID ) : 'fr';
-		$lang     = $lang ?: 'fr';
+		$lang     = TVF_Store::post_lang( $post->ID );
 		$weights  = TVF_Store::get_weights( $post->ID, $lang );
 		$registry = tvf_get_registry();
 
@@ -653,12 +664,11 @@ class TVF_Admin {
 			return;
 		}
 
-		$lang    = function_exists( 'pll_get_post_language' ) ? (string) pll_get_post_language( $post_id ) : 'fr';
-		$lang    = $lang ?: 'fr';
+		$lang    = TVF_Store::post_lang( $post_id );
 		$allowed = array_flip( tvf_get_all_slugs() );
 		$weights = [];
 
-		foreach ( $_POST['tvf_weight'] as $slug => $val ) {
+		foreach ( wp_unslash( $_POST['tvf_weight'] ) as $slug => $val ) {
 			$slug = sanitize_key( (string) $slug );
 			if ( isset( $allowed[ $slug ] ) ) {
 				$weights[ $slug ] = max( 0, min( 2, (int) $val ) );
@@ -666,6 +676,7 @@ class TVF_Admin {
 		}
 
 		TVF_Store::save_weights( $post_id, $lang, $weights );
+		TVF_Store::sync_post( $post_id, $lang );
 	}
 
 	// -------------------------------------------------------------------------
@@ -679,16 +690,18 @@ class TVF_Admin {
 		}
 
 		$post_id = (int) ( $_POST['post_id'] ?? 0 );
-		$lang    = sanitize_key( $_POST['lang'] ?? 'fr' );
 
 		if ( ! $post_id || ! get_post( $post_id ) ) {
 			wp_send_json_error( 'Invalid post' );
 		}
-		if ( ! in_array( $lang, [ 'fr', 'en', 'de' ], true ) ) {
-			$lang = 'fr';
-		}
 
-		$raw     = is_array( $_POST['weights'] ?? null ) ? $_POST['weights'] : [];
+		// The posted 'lang' is deliberately ignored: writing a post's rows
+		// under the wrong language rewrites the language of the rows that are
+		// already there, and the post disappears from its own language's
+		// results. See TVF_Store::post_lang().
+		$lang = TVF_Store::post_lang( $post_id );
+
+		$raw     = is_array( $_POST['weights'] ?? null ) ? wp_unslash( $_POST['weights'] ) : [];
 		$allowed = array_flip( tvf_get_all_slugs() );
 		$weights = [];
 
@@ -700,7 +713,9 @@ class TVF_Admin {
 		}
 
 		TVF_Store::save_weights( $post_id, $lang, $weights );
-		wp_send_json_success();
+		TVF_Store::sync_post( $post_id, $lang );
+
+		wp_send_json_success( [ 'lang' => $lang ] );
 	}
 
 	public static function ajax_get_weights(): void {
@@ -710,13 +725,15 @@ class TVF_Admin {
 		}
 
 		$post_id = (int) ( $_GET['post_id'] ?? 0 );
-		$lang    = sanitize_key( $_GET['lang'] ?? 'fr' );
 
-		if ( ! $post_id ) {
+		if ( ! $post_id || ! get_post( $post_id ) ) {
 			wp_send_json_error( 'Invalid post' );
 		}
 
-		wp_send_json_success( TVF_Store::get_weights( $post_id, $lang ) );
+		// Same reasoning as ajax_save(): the post decides its own language, so
+		// a mismatched 'lang' from the page's selector cannot silently return
+		// an empty set for a post that does have weights.
+		wp_send_json_success( TVF_Store::get_weights( $post_id, TVF_Store::post_lang( $post_id ) ) );
 	}
 
 	// -------------------------------------------------------------------------

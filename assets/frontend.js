@@ -14,7 +14,11 @@
 	const loadMoreWrap = document.getElementById( 'tvf-load-more-wrap' );
 	const loadMoreBtn  = document.getElementById( 'tvf-load-more' );
 
-	const BATCH = 42;
+	// The page size comes from PHP (TVF_Store::BATCH), which is also what the
+	// SQL LIMIT is built from — a second copy here would silently disagree with
+	// it the first time either changed. The literal is the floor for a stale
+	// cached copy of this file served against an older payload.
+	const BATCH = tvfFrontend.batch || 42;
 	let   nextOffset = BATCH;
 
 	// -------------------------------------------------------------------------
@@ -224,9 +228,11 @@
 	function updateDeadChips( deadSlugs ) {
 		wrap.querySelectorAll( '.tvf-chip' ).forEach( function ( chip ) {
 			const isDead = deadSlugs.includes( chip.dataset.slug ) && ! chip.classList.contains( 'is-on' );
+			// The class is the whole of the styling — .tvf-chip.is-dead in
+			// frontend.css already sets the same opacity and cursor. Writing
+			// them inline as well gave one state two sources of truth, and the
+			// inline pair silently won over any restyling of the class.
 			chip.classList.toggle( 'is-dead', isDead );
-			chip.style.opacity = isDead ? '0.35' : '';
-			chip.style.cursor  = isDead ? 'not-allowed' : '';
 			chip.setAttribute( 'aria-disabled', isDead ? 'true' : 'false' );
 			if ( isDead ) {
 				chip.setAttribute( 'tabindex', '-1' );

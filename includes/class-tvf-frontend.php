@@ -46,6 +46,9 @@ class TVF_Frontend {
 		// on the first interaction.
 		wp_localize_script( 'tvf-frontend', 'tvfFrontend', [
 			'restUrl' => rest_url( 'tvf/v1/results' ),
+			// The page size, so the script does not keep a second copy of a
+			// number the SQL LIMIT also depends on. See TVF_Store::BATCH.
+			'batch'   => TVF_Store::BATCH,
 			'i18n'    => [
 				'summaryPrefix' => self::text( 'summary_prefix', $lang ),
 				'summaryEmpty'  => self::text( 'summary_empty', $lang ),
@@ -165,6 +168,13 @@ class TVF_Frontend {
 	public static function rest_search_posts( WP_REST_Request $request ): WP_REST_Response {
 		$q    = $request->get_param( 'q' );
 		$lang = $request->get_param( 'lang' );
+
+		// Validated the same way rest_results() validates it: an unrecognised
+		// language handed to Polylang returns nothing at all, which reads as
+		// "no posts match" rather than as a bad parameter.
+		if ( ! in_array( $lang, [ 'fr', 'en', 'de' ], true ) ) {
+			$lang = 'fr';
+		}
 
 		$args = [
 			'post_type'      => 'post',
@@ -484,11 +494,12 @@ class TVF_Frontend {
 	 * Renders a page of card <article> elements, cached in a transient.
 	 * Returns ['html' => string, 'has_more' => bool, 'total_count' => int] at offset=0,
 	 * or ['html' => string, 'has_more' => bool] for subsequent pages (load-more).
-	 * Queries BATCH+1 rows; if 43 come back, has_more=true and only 42 are rendered.
+	 * Queries TVF_Store::BATCH + 1 rows; if the probe row comes back,
+	 * has_more=true and it is discarded before rendering.
 	 *
 	 * @param string[] $slugs
 	 * @param string   $lang
-	 * @param int      $offset 0-based row offset (multiples of 42).
+	 * @param int      $offset 0-based row offset (multiples of TVF_Store::BATCH).
 	 * @return array{html: string, has_more: bool, total_count?: int}
 	 */
 	public static function render_cards( array $slugs, string $lang, int $offset = 0 ): array {
@@ -509,7 +520,7 @@ class TVF_Frontend {
 		}
 
 		$rows     = TVF_Store::query_results( $lang, $slugs, $offset );
-		$has_more = count( $rows ) > 42;
+		$has_more = count( $rows ) > TVF_Store::BATCH;
 		if ( $has_more ) {
 			array_pop( $rows ); // discard the probe row
 		}

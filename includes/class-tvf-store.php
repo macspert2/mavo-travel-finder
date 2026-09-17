@@ -17,6 +17,20 @@ class TVF_Store {
 	const DEAD_CACHE_PREFIX = 'tvf_dead_';
 
 	/**
+	 * Results per page, everywhere: the SQL LIMIT, the "is there more?" test in
+	 * TVF_Frontend::render_cards(), and the offset step in assets/frontend.js,
+	 * which receives it through the tvfFrontend payload rather than keeping a
+	 * copy of its own.
+	 *
+	 * The queries fetch BATCH + 1 rows. The extra one is a probe: if it comes
+	 * back there is another page, and it is discarded before rendering. That
+	 * off-by-one is why this has to be one named value — the three places used
+	 * to spell it 43, 42 and 42, and changing one without the others breaks
+	 * "load more" in a way that reads as a caching fault.
+	 */
+	const BATCH = 42;
+
+	/**
 	 * Builds a transient key carrying the current cache generation for $lang.
 	 *
 	 * Invalidation works by bumping that generation rather than deleting rows.
@@ -69,6 +83,28 @@ class TVF_Store {
 	// -------------------------------------------------------------------------
 	// Read
 	// -------------------------------------------------------------------------
+
+	/**
+	 * The language a post's rows belong to — Polylang's answer, never the
+	 * caller's.
+	 *
+	 * The table's primary key is (post_id, filter_slug), with no language in
+	 * it, so a REPLACE carrying the wrong lang does not add a row: it rewrites
+	 * the language of the rows already there. A French post written with
+	 * lang=de vanishes from every French query, silently and permanently. So
+	 * every write path derives the language from the post itself rather than
+	 * accepting one from a form, an AJAX payload or a CSV import screen.
+	 *
+	 * Falls back to French when Polylang is absent, which is the language a
+	 * single-language install of this site would be in.
+	 */
+	public static function post_lang( int $post_id ): string {
+		if ( ! function_exists( 'pll_get_post_language' ) ) {
+			return 'fr';
+		}
+
+		return (string) ( pll_get_post_language( $post_id, 'slug' ) ?: 'fr' );
+	}
 
 	/** Returns [ filter_slug => weight ] for a given post + lang. */
 	public static function get_weights( int $post_id, string $lang = 'fr' ): array {
@@ -149,8 +185,9 @@ class TVF_Store {
 					 WHERE pf.lang = %s
 					 GROUP BY pf.post_id
 					 ORDER BY views DESC
-					 LIMIT 43 OFFSET %d",
+					 LIMIT %d OFFSET %d",
 					$lang,
+					self::BATCH + 1,
 					$offset
 				),
 				ARRAY_A
@@ -160,8 +197,8 @@ class TVF_Store {
 		$count        = count( $filter_slugs );
 		$placeholders = implode( ',', array_fill( 0, $count, '%s' ) );
 		[ $score_expr, $score_args ] = self::score_expression( $filter_slugs );
-		// score CASE args + $lang + N slugs + $count + $offset
-		$args = array_merge( $score_args, [ $lang ], $filter_slugs, [ $count, $offset ] );
+		// score CASE args + $lang + N slugs + $count + LIMIT + $offset
+		$args = array_merge( $score_args, [ $lang ], $filter_slugs, [ $count, self::BATCH + 1, $offset ] );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $wpdb->get_results(
@@ -181,7 +218,7 @@ class TVF_Store {
 				 GROUP BY pf.post_id
 				 HAVING COUNT(DISTINCT pf.filter_slug) = %d
 				 ORDER BY score DESC, views DESC
-				 LIMIT 43 OFFSET %d",
+				 LIMIT %d OFFSET %d",
 				...$args
 			),
 			ARRAY_A
@@ -357,6 +394,11 @@ class TVF_Store {
 	 * means any weights manually edited directly on an EN/DE post will
 	 * be overwritten the next time this runs.
 	 *
+	 * This is the backfill. The routine path is sync_post(), which runs on
+	 * every French save and keeps the translations current without anyone
+	 * having to remember the button; this exists for the first run after an
+	 * import, and for repairing a site whose translations have drifted.
+	 *
 	 * @return array{synced:int, fr_posts_checked:int, languages:array{en:int,de:int}}
 	 */
 	public static function sync_translations(): array {
@@ -366,25 +408,19 @@ class TVF_Store {
 			return [ 'synced' => 0, 'fr_posts_checked' => 0, 'languages' => $languages ];
 		}
 
-		global $wpdb;
-		$table = self::table_name();
+		// One query for every French weight on the site, rather than a
+		// get_weights() per post: this loop can cover the whole catalogue, and
+		// the per-post form made it several thousand round trips.
+		$fr_weights = self::all_weights( 'fr' );
+		$synced     = 0;
 
-		$fr_post_ids = $wpdb->get_col(
-			$wpdb->prepare( "SELECT DISTINCT post_id FROM {$table} WHERE lang = %s", 'fr' )
-		);
-
-		$synced = 0;
-
-		foreach ( $fr_post_ids as $fr_post_id ) {
-			$fr_post_id = (int) $fr_post_id;
-			$weights    = self::get_weights( $fr_post_id, 'fr' );
-
+		foreach ( $fr_weights as $fr_post_id => $weights ) {
 			if ( empty( $weights ) ) {
 				continue;
 			}
 
 			foreach ( [ 'en', 'de' ] as $lang ) {
-				$translated_id = pll_get_post( $fr_post_id, $lang );
+				$translated_id = pll_get_post( (int) $fr_post_id, $lang );
 
 				if ( ! $translated_id || ! get_post( $translated_id ) ) {
 					continue;
@@ -406,9 +442,53 @@ class TVF_Store {
 
 		return [
 			'synced'           => $synced,
-			'fr_posts_checked' => count( $fr_post_ids ),
+			'fr_posts_checked' => count( $fr_weights ),
 			'languages'        => $languages,
 		];
+	}
+
+	/**
+	 * Propagates one French post's weights to its EN/DE translations.
+	 *
+	 * Called from every path that writes French weights, so a translated post
+	 * is never left ranking on scores its French original no longer has. Before
+	 * this existed the only way to update EN/DE was the "Synchroniser EN/DE"
+	 * button, and until someone remembered to press it both languages served
+	 * stale scores — to the [travel_finder] page and to mavo-for-you's
+	 * recommendations alike.
+	 *
+	 * Cheap enough for save_post: two pll_get_post() lookups and two
+	 * save_weights() calls, each of which is one SELECT and no writes when
+	 * nothing has actually changed. Non-French posts are ignored, so a save on
+	 * a translation never propagates backwards.
+	 *
+	 * @return int Translations written to.
+	 */
+	public static function sync_post( int $post_id, string $lang ): int {
+		if ( 'fr' !== $lang || ! function_exists( 'pll_get_post' ) ) {
+			return 0;
+		}
+
+		$weights = self::get_weights( $post_id, 'fr' );
+
+		if ( empty( $weights ) ) {
+			return 0;
+		}
+
+		$synced = 0;
+
+		foreach ( [ 'en', 'de' ] as $target_lang ) {
+			$translated_id = (int) pll_get_post( $post_id, $target_lang );
+
+			if ( ! $translated_id || ! get_post( $translated_id ) ) {
+				continue;
+			}
+
+			self::save_weights( $translated_id, $target_lang, $weights );
+			++$synced;
+		}
+
+		return $synced;
 	}
 
 	// -------------------------------------------------------------------------
@@ -596,13 +676,14 @@ class TVF_Store {
 			$wpdb->prepare(
 				"SELECT p.ID, p.post_title,
 				    COUNT( pf.filter_slug ) AS configured,
-				    {$total_filters}        AS total
+				    %d                      AS total
 				 FROM {$wpdb->posts} p
 				 LEFT JOIN {$table} pf
 				     ON pf.post_id = p.ID AND pf.lang = %s
 				 WHERE p.post_status = 'publish' AND p.post_type = 'post'
 				 GROUP BY p.ID
 				 ORDER BY configured ASC, p.post_title ASC",
+				$total_filters,
 				$lang
 			),
 			ARRAY_A

@@ -13,23 +13,131 @@ defined( 'ABSPATH' ) || exit;
 class TVF_Focus {
 
 	/**
-	 * Full-finder page per language. A language with no entry simply gets no
-	 * escalation link rather than a link to another language's page.
+	 * Slug of the page hosting [travel_finder], per language.
 	 *
-	 * These are the pages hosting [travel_finder]; the focus pages hosting
-	 * [travel_finder_focus] are different URLs again (/nos-idees-de-voyage/,
-	 * /en/our-travel-ideas/, /de/unsere-reiseideen/) and live in the theme.
+	 * These are the pages the focus view escalates to; the focus pages hosting
+	 * [travel_finder_focus] are different pages again (/nos-idees-de-voyage/,
+	 * /en/our-travel-ideas/, /de/unsere-reiseineen/) and live in the theme.
 	 */
-	const FULL_FINDER_URLS = [
+	const FULL_FINDER_SLUGS = [
+		'fr' => 'ou-partir-trouvez-votre-prochain-voyage',
+		'en' => 'where-to',
+		'de' => 'wohin-reisen',
+	];
+
+	/**
+	 * Absolute URLs, used only if the slug lookup finds nothing.
+	 *
+	 * These were the whole of the mechanism, which made an editor's slug edit,
+	 * a domain change and a staging copy each silently produce a link to the
+	 * wrong site or a 404. They stay as a floor: on the live site with the
+	 * pages in place they are never reached, and on a site where the lookup
+	 * fails the link is no worse than it was before.
+	 */
+	const FULL_FINDER_FALLBACK_URLS = [
 		'fr' => 'https://www.mamanvoyage.com/ou-partir-trouvez-votre-prochain-voyage/',
 		'en' => 'https://www.mamanvoyage.com/en/where-to/',
 		'de' => 'https://www.mamanvoyage.com/de/wohin-reisen/',
 	];
 
+	/** Per-request memo of resolved full-finder page IDs, keyed by language. */
+	private static array $full_finder_ids = [];
+
+	/**
+	 * The URL of the full [travel_finder] page in a language, or null.
+	 *
+	 * Resolved from the configured slug rather than hard-coded, then — failing
+	 * that — from Polylang's translation of whichever language's page can be
+	 * found, so a page an editor renamed in one language is still reachable
+	 * from the others. Cached in a transient; the lookup itself is one indexed
+	 * query on a miss.
+	 */
+	public static function full_finder_url( string $lang ): ?string {
+		$post_id = self::full_finder_id( $lang );
+
+		if ( $post_id ) {
+			return (string) get_permalink( $post_id );
+		}
+
+		return self::FULL_FINDER_FALLBACK_URLS[ $lang ] ?? null;
+	}
+
+	private static function full_finder_id( string $lang ): int {
+		if ( isset( self::$full_finder_ids[ $lang ] ) ) {
+			return self::$full_finder_ids[ $lang ];
+		}
+
+		$key    = 'tvf_ff_page_' . $lang;
+		$cached = get_transient( $key );
+
+		if ( false !== $cached ) {
+			return self::$full_finder_ids[ $lang ] = (int) $cached;
+		}
+
+		$found = 0;
+		$slug  = self::FULL_FINDER_SLUGS[ $lang ] ?? '';
+
+		if ( '' !== $slug ) {
+			$page  = get_page_by_path( $slug, OBJECT, 'page' );
+			$found = $page instanceof WP_Post ? self::validate_page( $page->ID, $lang ) : 0;
+		}
+
+		// The slugs are a guess at what the pages were called; the translation
+		// relationship is a fact an editor stated. So any language's page that
+		// can be found seeds the lookup, and this language's version is
+		// whatever Polylang links to it.
+		if ( ! $found && function_exists( 'pll_get_post' ) ) {
+			foreach ( self::FULL_FINDER_SLUGS as $other_lang => $other_slug ) {
+				if ( $other_lang === $lang || '' === $other_slug ) {
+					continue;
+				}
+
+				$seed = get_page_by_path( $other_slug, OBJECT, 'page' );
+				if ( ! $seed instanceof WP_Post ) {
+					continue;
+				}
+
+				$translated = (int) pll_get_post( $seed->ID, $lang );
+				$found      = $translated ? self::validate_page( $translated, $lang ) : 0;
+
+				if ( $found ) {
+					break;
+				}
+			}
+		}
+
+		set_transient( $key, $found, DAY_IN_SECONDS );
+
+		return self::$full_finder_ids[ $lang ] = $found;
+	}
+
+	/** A published page, in the language it claims to be in. */
+	private static function validate_page( int $post_id, string $lang ): int {
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof WP_Post || 'page' !== $post->post_type || 'publish' !== $post->post_status ) {
+			return 0;
+		}
+
+		return TVF_Store::post_lang( $post_id ) === $lang ? $post_id : 0;
+	}
+
+	/** A new page, or a slug change, must be findable without waiting out the transient. */
+	public static function forget_full_finder_ids(): void {
+		self::$full_finder_ids = [];
+
+		foreach ( array_keys( self::FULL_FINDER_SLUGS ) as $lang ) {
+			delete_transient( 'tvf_ff_page_' . $lang );
+		}
+	}
+
 	public static function init(): void {
 		add_shortcode( 'travel_finder_focus', [ __CLASS__, 'render_shortcode' ] );
 		add_action( 'template_redirect', [ __CLASS__, 'maybe_redirect' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+
+		add_action( 'save_post_page', [ __CLASS__, 'forget_full_finder_ids' ] );
+		add_action( 'deleted_post', [ __CLASS__, 'forget_full_finder_ids' ] );
 	}
 
 	/** Redirects to the homepage when the hosting page has no valid `f` slugs. */
@@ -73,7 +181,7 @@ class TVF_Focus {
 
 		$lang     = self::current_lang();
 		$posts    = TVF_Store::resolve_posts_for_slugs( $lang, $slugs, 9 );
-		$full_url = self::FULL_FINDER_URLS[ $lang ] ?? null;
+		$full_url = self::full_finder_url( $lang );
 		$more_url = $full_url ? add_query_arg( 'f', implode( ',', $slugs ), $full_url ) : null;
 
 		ob_start();
