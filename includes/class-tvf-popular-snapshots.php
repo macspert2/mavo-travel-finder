@@ -97,15 +97,23 @@ class TVF_Popular_Snapshots {
 	}
 
 	/**
-	 * Top published posts by all-time view count (wp_postmeta
+	 * Top published posts by *recent* view count (wp_postmeta
 	 * meta_key='views'), filtered by language — a fallback for when
 	 * "last year, same month" has no snapshot data at all. Tried and
 	 * replaced an earlier "most recent snapshot month" fallback that
 	 * still relied on the same thin snapshot table and could return as
-	 * little as 1 EN / 0 DE post after language filtering; this draws
-	 * from every published post's all-time view count instead, which
-	 * doesn't depend on the snapshot table's (or wp_tvf_post_filter's)
-	 * language coverage at all.
+	 * little as 1 EN / 0 DE post after language filtering; this draws on
+	 * the `views` meta instead, which doesn't depend on the snapshot
+	 * table's (or wp_tvf_post_filter's) language coverage at all.
+	 *
+	 * This docblock said "all-time view count", twice, and that is not what
+	 * the meta holds. `views` is maintained by recent-post-popularity as a
+	 * rolling ~90-day total, recomputed daily, and a post with no hits in
+	 * that window is actively reset to 0 — so an article that was hugely
+	 * read three years ago ranks here below one nobody has ever opened.
+	 * That is defensible for a "what is popular now" fallback, which is what
+	 * this is; it is not a lifetime ranking, and nothing should be built on
+	 * the assumption that it is.
 	 *
 	 * Overfetches a generous top-200 by views before language-filtering,
 	 * since most of that 200 will likely be French — narrowing first

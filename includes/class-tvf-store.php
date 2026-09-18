@@ -161,6 +161,13 @@ class TVF_Store {
 	 * Runs the scoring query. Fetches BATCH+1 rows so callers can detect whether
 	 * more results exist beyond the current page.
 	 *
+	 * The `views` column is the tie-break, and it is worth knowing what it
+	 * means: recent-post-popularity maintains that meta as a rolling ~90-day
+	 * total and resets a post with no hits in the window to 0. So ties are
+	 * broken by *recent* readership, not lifetime — an older article that has
+	 * gone quiet sorts with the never-read ones. Intentional for a "what
+	 * should someone read now" list; see RPP_Aggregator::run() for the source.
+	 *
 	 * @param string   $lang
 	 * @param string[] $filter_slugs
 	 * @param int      $offset       0-based row offset for pagination.
